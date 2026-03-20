@@ -19,7 +19,7 @@ vim.opt.autoindent = true -- Copy indent from current line
 vim.g.editorconfig = true -- Use settings in .editorconfig
 
 vim.opt.grepprg = "rg --vimgrep" -- Use ripgrep
-vim.opt.grepformat = "%f:%l:c:%m" -- Filename, line number, column, content
+vim.opt.grepformat = "%f:%l:%c:%m" -- Filename, line number, column, content
 
 -- Search settings
 vim.opt.ignorecase = true -- Case insensitive search
@@ -67,6 +67,9 @@ if vim.fn.isdirectory(undodir_path) == 0 then
 	vim.fn.mkdir(undodir_path, "p") -- Create if not exists
 end
 
+vim.opt.wildoptions = "pum"
+
+
 -- Behaviour settings
 vim.opt.errorbells = false -- Disable error sounds
 vim.opt.backspace = "indent,eol,start"
@@ -76,7 +79,6 @@ vim.opt.path:append("**") -- Search into subfolders with 'gf'
 vim.opt.selection = "inclusive"
 vim.opt.mouse = "a" -- Enable mouse support
 vim.opt.clipboard:append("unnamedplus") -- Use system clipboard
-vim.opt.modifiable = true -- Allow editing buffers
 vim.opt.encoding = "UTF-8"
 vim.opt.wildmenu = true -- Enable command line completion menu
 vim.opt.wildmode = "longest:full,full" -- Completion mode for the command line

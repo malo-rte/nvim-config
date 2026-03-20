@@ -2,7 +2,15 @@
 local M = {}
 
 -- Prefer vim.uv on newer Neovim, fall back to vim.loop
-local uv = vim.uv or vim.loop
+---@diagnostic disable: undefined-field
+local uv_cwd = (vim.uv or vim.loop).cwd
+local uv_os_homedir = (vim.uv or vim.loop).os_homedir
+local uv_fs_stat = (vim.uv or vim.loop).fs_stat
+local uv_fs_scandir = (vim.uv or vim.loop).fs_scandir
+local uv_fs_scandir_next = (vim.uv or vim.loop).fs_scandir_next
+---@diagnostic enable: undefined-field
+
+local root_cache = {}
 
 local MARKERS = { ".git", "Cargo.toml", "go.mod", "pyproject.toml", "package.json" }
 local DEFAULT_IGNORE = {
@@ -31,11 +39,11 @@ local function start_dir()
 	if buf ~= "" then
 		return vim.fs.dirname(vim.fn.fnamemodify(buf, ":p"))
 	end
-	return uv.cwd()
+	return uv_cwd()
 end
 
 local function root_by_markers(path)
-	local home = uv.os_homedir()
+	local home = uv_os_homedir()
 	local stop = (path:sub(1, #home) == home) and home or "/"
 	local found = vim.fs.find(MARKERS, { path = path, upward = true, stop = stop })
 	if #found > 0 then
@@ -45,21 +53,59 @@ end
 
 local function has_marker(dir, markers)
 	for _, m in ipairs(markers) do
-		if uv.fs_stat(vim.fs.joinpath(dir, m)) then
+		if uv_fs_stat(vim.fs.joinpath(dir, m)) then
 			return true
 		end
 	end
 	return false
 end
 
-function M.project_root()
-	local path = start_dir()
+local function compute_root(path)
 	local out = vim.fn.systemlist({ "git", "-C", path, "rev-parse", "--show-toplevel" })
+
 	if vim.v.shell_error == 0 and out[1] and out[1] ~= "" then
 		return out[1]
 	end
+
 	return root_by_markers(path) or path
 end
+
+local function within(dir, base)
+	dir, base = vim.fs.normalize(dir), vim.fs.normalize(base)
+	return dir == base or dir:sub(1, #base + 1) == base .. "/"
+end
+
+function M.project_root(opts)
+	opts = opts or {}
+	local path = vim.fn.fnamemodify(opts.path or start_dir(), ":p")
+
+	-- If the focused buffer is outside the working dir (e.g. a stray
+	-- session-restored file), anchor to the cwd you actually launched in
+	-- / switched into, not the stray file's location.
+	local cwd = vim.fn.getcwd()
+	if not within(path, cwd) then
+		path = vim.fn.fnamemodify(cwd, ":p")
+	end
+
+	if not opts.no_cache and root_cache[path] then
+		return root_cache[path]
+	end
+	local root = compute_root(path)
+	if not opts.no_cache then
+		root_cache[path] = root
+	end
+	return root
+end
+
+function M.clear_root_cache()
+	root_cache = {}
+end
+
+vim.api.nvim_create_autocmd({ "BufEnter", "DirChanged" }, {
+	callback = function()
+		M.clear_root_cache()
+	end,
+})
 
 function M.find_projects(root, opts)
 	opts = opts or {}
@@ -70,8 +116,8 @@ function M.find_projects(root, opts)
 	local limit = opts.limit or math.huge
 	local prune_on_match = opts.prune_on_match or false
 
-	root = vim.fn.fnamemodify(root or uv.cwd(), ":p")
-	local st = uv.fs_stat(root)
+	root = vim.fn.fnamemodify(root or uv_cwd(), ":p")
+	local st = uv_fs_stat(root)
 	if not st or st.type ~= "directory" then
 		return {}
 	end
@@ -107,10 +153,10 @@ function M.find_projects(root, opts)
 		end
 
 		if depth < max_depth then
-			local ok, iter = pcall(uv.fs_scandir, dir)
+			local ok, iter = pcall(uv_fs_scandir, dir)
 			if ok and iter then
 				while true do
-					local name, typ = uv.fs_scandir_next(iter)
+					local name, typ = uv_fs_scandir_next(iter)
 					if not name then
 						break
 					end
@@ -157,7 +203,7 @@ function M.project_picker(root, opts)
 
 	local projects = M.find_projects(root, opts.scan)
 	if #projects == 0 then
-		vim.notify("No projects found under " .. vim.fn.fnamemodify(root or (uv.cwd()), ":~"), vim.log.levels.WARN)
+		vim.notify("No projects found under " .. vim.fn.fnamemodify(root or (uv_cwd()), ":~"), vim.log.levels.WARN)
 		return
 	end
 
@@ -177,7 +223,7 @@ function M.project_picker(root, opts)
 	local theme = t.themes.get_ivy()
 	t.pickers
 		.new(theme, {
-			prompt_title = ("Projects (%s)"):format(vim.fn.fnamemodify(root or uv.cwd(), ":~")),
+			prompt_title = ("Projects (%s)"):format(vim.fn.fnamemodify(root or uv_cwd(), ":~")),
 			finder = t.finders.new_table({
 				results = projects,
 				entry_maker = function(path)

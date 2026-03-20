@@ -30,14 +30,19 @@ return {
 		wk.add({
 			{ "<leader>b", group = "Buffers" },
 			{ "<leader>c", group = "Code" },
+			{ "<leader>d", group = "Debug" },
 			{ "<leader>ct", group = "Toggle" },
 			{ "<leader>f", group = "Find/File" },
+			{ "<leader>g", group = "Git" },
+			{ "<leader>gc", group = "Conflict" },
+			{ "<leader>gr", group = "Rebase" },
 			{ "<leader>i", group = "Insert" },
 			{ "<leader>in", group = "Insert Nerdfont" },
 			{ "<leader>w", group = "Windows" },
 			{ "<leader>q", group = "Sessions" },
 			{ "<leader>t", group = "Toggle" },
 			{ "<leader>u", group = "UI" },
+			{ "<leader>y", group = "Yocto" },
 		})
 	end,
 }

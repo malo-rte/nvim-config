@@ -8,7 +8,15 @@ return {
 		local opts = {
 			formatters_by_ft = {
 				lua = { "stylua" },
-				python = { "isort", "black" },
+
+				python = function(bufnr)
+					if c.get_formatter_info("ruff_format", bufnr).available then
+						return { "ruff_format" }
+					else
+						return { "isort", "black" }
+					end
+				end,
+
 				rust = { "rustfmt" },
 				javascript = { "prettierd", "prettier", stop_after_first = true },
 				javascriptreact = { "prettier", stop_after_first = true },
@@ -25,8 +33,7 @@ return {
 				asm = { "asmfmt" },
 				markdown = { "prettierd", "prettier" },
 				graphql = { "prettierd", "prettier" },
-				md = { "prettierd", "prettier" },
-				txt = { "prettierd", "prettier" },
+				text = { "prettierd", "prettier" },
 				cmake = { "cmake_format" },
 
 				sh = { "shfmt" },
@@ -60,7 +67,16 @@ return {
 				},
 			},
 
-			format_on_save = { timeout_ms = 1500, lsp_format = "never" },
+			format_on_save = function(bufnr)
+				if vim.b[bufnr].enable_format_on_save then
+					return {
+						timeout_ms = 1500,
+						lsp_format = "never",
+					}
+				end
+
+				return nil
+			end,
 		}
 
 		c.setup(opts)
