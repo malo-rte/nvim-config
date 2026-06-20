@@ -61,10 +61,15 @@ return {
 			local env = require("config.env")
 			if env.parser_dir then
 				-- NixOS: precompiled parsers from nix on the runtimepath, no
-				-- compilation. nixpkgs does not package every grammar (gnuplot,
-				-- gpg, idl, kconfig, m68k, objdump, promql, ssh_config,
-				-- terraform, tmux), so those filetypes have no treesitter here.
-				vim.opt.runtimepath:prepend(env.parser_dir)
+				-- compilation. APPEND (not prepend) so Neovim's own bundled
+				-- parsers (c, lua, vim, markdown, query, ...) win -- they match
+				-- Neovim's/nvim-treesitter's queries, whereas the frozen nixpkgs
+				-- versions can lag and throw "invalid node type" query errors
+				-- (e.g. the cmdline vim parser). nix only fills the gaps.
+				-- nixpkgs does not package every grammar (gnuplot, gpg, idl,
+				-- kconfig, m68k, objdump, promql, ssh_config, terraform, tmux),
+				-- so those filetypes have no treesitter here.
+				vim.opt.runtimepath:append(env.parser_dir)
 			else
 				-- Portable (dev container): compile parsers locally.
 				require("nvim-treesitter").install(langs)
