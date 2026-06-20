@@ -58,7 +58,17 @@ return {
 		lazy = false,
 		build = ":TSUpdate",
 		config = function()
-			require("nvim-treesitter").install(langs)
+			local env = require("config.env")
+			if env.parser_dir then
+				-- NixOS: precompiled parsers from nix on the runtimepath, no
+				-- compilation. nixpkgs does not package every grammar (gnuplot,
+				-- gpg, idl, kconfig, m68k, objdump, promql, ssh_config,
+				-- terraform, tmux), so those filetypes have no treesitter here.
+				vim.opt.runtimepath:prepend(env.parser_dir)
+			else
+				-- Portable (dev container): compile parsers locally.
+				require("nvim-treesitter").install(langs)
+			end
 
 			-- main branch does NOT auto-start highlighting; do it per-filetype
 			vim.api.nvim_create_autocmd("FileType", {
