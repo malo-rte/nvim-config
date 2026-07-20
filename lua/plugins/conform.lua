@@ -19,9 +19,9 @@ return {
 
 				rust = { "rustfmt" },
 				javascript = { "prettierd", "prettier", stop_after_first = true },
-				javascriptreact = { "prettier", stop_after_first = true },
-				typescript = { "prettier", stop_after_first = true },
-				typescriptreact = { "prettier", stop_after_first = true },
+				javascriptreact = { "prettierd", "prettier", stop_after_first = true },
+				typescript = { "prettierd", "prettier", stop_after_first = true },
+				typescriptreact = { "prettierd", "prettier", stop_after_first = true },
 				json = { "prettierd", "prettier", stop_after_first = true },
 				jsonc = { "prettierd", "prettier", stop_after_first = true },
 				yaml = { "prettierd", "prettier", stop_after_first = true },

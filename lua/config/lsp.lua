@@ -30,7 +30,6 @@ vim.api.nvim_create_autocmd("LspAttach", {
 
 		-- Core LSP maps
 		map("gd", vim.lsp.buf.definition, "Go to definition")
-		map("gr", vim.lsp.buf.references, "References (LSP)")
 		map("gD", vim.lsp.buf.declaration, "Go to declaration")
 		map("gi", vim.lsp.buf.implementation, "Go to implementation")
 		map("K", vim.lsp.buf.hover, "Hover docs")
