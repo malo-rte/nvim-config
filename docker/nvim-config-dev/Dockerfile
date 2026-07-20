@@ -72,6 +72,14 @@ RUN curl -fsSL https://claude.ai/install.sh | bash
 # libpcsclite-dev, libusb-1.0-0-dev) come from dev-tools-build.
 RUN cargo install --locked age-plugin-yubikey
 
+# tree-sitter CLI: nvim-treesitter's main branch shells out to it to
+# compile parsers. In this portable/container path lua/plugins/treesitter.lua
+# calls require("nvim-treesitter").install(langs); without the CLI every
+# parser build fails with ENOENT. (On NixOS parsers come from nix instead,
+# so this isn't needed there.) build-essential (gcc) comes from
+# dev-tools-build for the actual compilation step.
+RUN cargo install --locked tree-sitter-cli
+
 ENV CLAUDE_CONFIG_DIR="/home/${USER_NAME}/.claude"
 
 RUN mkdir -p \
