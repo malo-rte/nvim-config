@@ -20,6 +20,9 @@ M.setup = function ()
         virtual_text = false,
         virtual_lines = { current_line = true, },
         severity_sort =  true,
+        update_in_insert = true,
+        float = { source = 'if_many' },
+        jump = { float = true },
     })
 end
 
