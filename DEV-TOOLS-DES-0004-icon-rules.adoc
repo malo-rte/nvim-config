@@ -713,7 +713,7 @@ Prefer binary-format detection over extension for ELF, PE, and Mach-O files.
 | PKCS#12 `.p12`, `.pfx` |  | `nf-fa-lock`
 | Certificate request `.csr` | 󰄤 | `nf-md-certificate_outline`
 | GPG key `.gpg`, `.pgp`, `.asc` | 󰌆 | `nf-md-key`
-| Detached signature `.sig`, `.sign` | 󰊕 | `nf-md-fountain_pen_tip`
+| Detached signature `.sig`, `.sign` | 󰴓 | `nf-md-fountain_pen_tip`
 | Age-encrypted `.age` |  | `nf-fa-lock`
 | Password database `.kdbx` | 󰌆 | `nf-md-key`
 | TPM blob | 󰒃 | `nf-md-shield_check`
