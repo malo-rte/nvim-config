@@ -55,6 +55,28 @@ RUN set -eux; \
     ln -sf "/opt/${asset}/bin/nvim" /usr/local/bin/nvim; \
     nvim --version | head -1
 
+# tree-sitter CLI: nvim-treesitter's main branch shells out to it to compile
+# parsers. In this portable/container path lua/plugins/treesitter.lua calls
+# require("nvim-treesitter").install(langs); without the CLI every parser
+# build fails with ENOENT: 'tree-sitter'. Use the upstream prebuilt binary --
+# `cargo install tree-sitter-cli` would pull in bindgen and need libclang,
+# which the image doesn't have. build-essential (gcc) from dev-tools-build
+# still does the actual parser compile. NixOS gets parsers from nix instead,
+# so this isn't needed there.
+ARG TREE_SITTER_VERSION=v0.26.11
+RUN set -eux; \
+    case "$(uname -m)" in \
+      x86_64)  ts_arch="linux-x64"   ;; \
+      aarch64) ts_arch="linux-arm64" ;; \
+      *)       echo "unsupported arch: $(uname -m)" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL -o /tmp/tree-sitter.gz \
+      "https://github.com/tree-sitter/tree-sitter/releases/download/${TREE_SITTER_VERSION}/tree-sitter-${ts_arch}.gz"; \
+    gunzip -c /tmp/tree-sitter.gz > /usr/local/bin/tree-sitter; \
+    rm /tmp/tree-sitter.gz; \
+    chmod +x /usr/local/bin/tree-sitter; \
+    tree-sitter --version
+
 RUN set -eux; \
     usermod -aG sudo "${USER_NAME}"; \
     echo "${USER_NAME} ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/${USER_NAME}"; \
@@ -71,14 +93,6 @@ RUN curl -fsSL https://claude.ai/install.sh | bash
 # subsection in decisions/). The build deps (Rust toolchain,
 # libpcsclite-dev, libusb-1.0-0-dev) come from dev-tools-build.
 RUN cargo install --locked age-plugin-yubikey
-
-# tree-sitter CLI: nvim-treesitter's main branch shells out to it to
-# compile parsers. In this portable/container path lua/plugins/treesitter.lua
-# calls require("nvim-treesitter").install(langs); without the CLI every
-# parser build fails with ENOENT. (On NixOS parsers come from nix instead,
-# so this isn't needed there.) build-essential (gcc) comes from
-# dev-tools-build for the actual compilation step.
-RUN cargo install --locked tree-sitter-cli
 
 ENV CLAUDE_CONFIG_DIR="/home/${USER_NAME}/.claude"
 
