@@ -7,6 +7,7 @@
 #     pinentry-tty) for hands-on mpass YubiKey work
 #   - the age-plugin-yubikey runtime binary mpass shells out to
 #   - Claude Code CLI
+#   - Haskell toolchain via ghcup (ghc, cabal, haskell-language-server)
 #
 # Anything actually needed to compile workspace crates or render the
 # docs already lives in dev-tools-build.
@@ -29,6 +30,11 @@ ARG DEV_PACKAGES="\
     pcsc-tools \
     yubikey-manager \
     pinentry-tty \
+    libgmp-dev \
+    libffi-dev \
+    libncurses-dev \
+    zlib1g-dev \
+    libnuma-dev \
 "
 
 RUN apt-get update && \
@@ -93,6 +99,26 @@ RUN curl -fsSL https://claude.ai/install.sh | bash
 # subsection in decisions/). The build deps (Rust toolchain,
 # libpcsclite-dev, libusb-1.0-0-dev) come from dev-tools-build.
 RUN cargo install --locked age-plugin-yubikey
+
+# Haskell toolchain via ghcup: ghc + cabal + haskell-language-server, so
+# lsp/hls.lua's haskell-language-server-wrapper can actually start. Large
+# layer (GHC + HLS are multi-GB). The GHC bindist's link/runtime libs
+# (libgmp, libffi, ncurses/libtinfo, zlib, libnuma) come from DEV_PACKAGES;
+# build-essential is inherited from dev-tools-build. NixOS provides this
+# toolchain via nix instead, so it's container-only. GHC_VERSION accepts a
+# version, "recommended", or "latest"; bump/pin it as needed.
+ARG GHC_VERSION=recommended
+RUN set -eux; \
+    export BOOTSTRAP_HASKELL_NONINTERACTIVE=1 \
+           BOOTSTRAP_HASKELL_GHC_VERSION="${GHC_VERSION}" \
+           BOOTSTRAP_HASKELL_INSTALL_HLS=1 \
+           BOOTSTRAP_HASKELL_ADJUST_BASHRC=0 \
+           GHCUP_INSTALL_BASE_PREFIX="/home/${USER_NAME}"; \
+    curl --proto '=https' --tlsv1.2 -sSf \
+      https://raw.githubusercontent.com/haskell/ghcup-hs/master/scripts/bootstrap/bootstrap-haskell | sh; \
+    "/home/${USER_NAME}/.ghcup/bin/ghc" --version; \
+    "/home/${USER_NAME}/.ghcup/bin/haskell-language-server-wrapper" --version
+ENV PATH="/home/${USER_NAME}/.ghcup/bin:/home/${USER_NAME}/.cabal/bin:${PATH}"
 
 ENV CLAUDE_CONFIG_DIR="/home/${USER_NAME}/.claude"
 
