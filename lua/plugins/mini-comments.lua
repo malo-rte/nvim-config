@@ -46,7 +46,7 @@ return  {
     opts = opts,
 
     config = function(_, o)
-        mc = require("mini.comment")
+        local mc = require("mini.comment")
         mc.setup(o)
     end,
 }

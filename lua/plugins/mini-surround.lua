@@ -41,8 +41,9 @@ local opts = {
 }
 
 return {
-    'nvim-mini/mini.surround', 
+    'nvim-mini/mini.surround',
     version = '*',
+    opts = opts,
 
     config = function(_, o)
         local ms = require("mini.surround")

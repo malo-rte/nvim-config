@@ -27,7 +27,7 @@ return {
 	opts = opts,
 
 	config = function(_, o)
-		mm = require("mini.move")
+		local mm = require("mini.move")
 		mm.setup(o)
 	end,
 }
