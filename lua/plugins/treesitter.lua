@@ -20,6 +20,7 @@ local langs = {
 	"groovy",
 	"go",
 	"graphql",
+	"haskell",
 	"html",
 	"http",
 	"idl",

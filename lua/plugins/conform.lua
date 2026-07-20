@@ -18,6 +18,8 @@ return {
 				end,
 
 				rust = { "rustfmt" },
+				haskell = { "fourmolu" },
+				cabal = { "cabal_fmt" },
 				javascript = { "prettierd", "prettier", stop_after_first = true },
 				javascriptreact = { "prettierd", "prettier", stop_after_first = true },
 				typescript = { "prettierd", "prettier", stop_after_first = true },
