@@ -4,64 +4,20 @@ local conf = require("telescope.config").values
 local actions = require("telescope.actions")
 local action_state = require("telescope.actions.state")
 
-local function to_codepoint(v)
-	if type(v) == "number" then
-		return v
-	end
-	if type(v) ~= "string" then
-		return nil
-	end
-	-- try U+XXXX from either "U+F118E" or "<U+F118E>"
-	local u = v:match("U%+([%x]+)") or v:match("<U%+([%x]+)>")
-	if u then
-		return tonumber(u, 16)
-	end
-	-- strip 0x / U+ prefixes if present
-	local hex = v:gsub("^0x", ""):gsub("^U%+", "")
-	if hex:match("^[%x]+$") then
-		return tonumber(hex, 16)
-	end
-	return nil
-end
+-- Glyph parsing lives in utils.nerdfont (single source of truth for
+-- glyphnames.json). list_all() returns { name, char, code, display };
+-- we only sort by name here for a stable picker order.
+local nerdfont = require("utils.nerdfont")
 
 local function load_glyphs()
-	local path = vim.fn.stdpath("data") .. "/nerdfont/glyphnames.json"
-	local f = io.open(path, "r")
-	if not f then
-		vim.notify("Nerd Font glyph map not found at " .. path, vim.log.levels.ERROR)
+	local list = nerdfont.list_all()
+	if #list == 0 then
+		vim.notify(
+			"Nerd Font glyph map not available (run :lua require('utils.nerdfont').update(true))",
+			vim.log.levels.ERROR
+		)
 		return {}
 	end
-	local data = f:read("*a")
-	f:close()
-	local ok, decoded = pcall(vim.json.decode, data)
-	if not ok or type(decoded) ~= "table" then
-		vim.notify("Failed to parse glyphnames.json", vim.log.levels.ERROR)
-		return {}
-	end
-
-	local list = {}
-	-- your file is a map: { ["md-foo"] = { code="f1234", char="<U+F1234>" }, ... }
-	for name, entry in pairs(decoded) do
-		local cp
-		if type(entry) == "table" then
-			cp = entry.code or entry.codepoint or entry.cp or entry.value
-			if not cp and entry.char then
-				cp = entry.char -- like "<U+F118E>"
-			end
-		else
-			cp = entry
-		end
-		local n = to_codepoint(cp)
-		if n then
-			local ch = vim.fn.nr2char(n)
-			table.insert(list, {
-				name = name,
-				char = ch,
-				code = n,
-			})
-		end
-	end
-
 	table.sort(list, function(a, b)
 		return a.name < b.name
 	end)
