@@ -1,3 +1,7 @@
+local icons = require("utils.icons")
+local di = icons.diagnostics
+local git = icons.git
+
 local opts = {
 	options = {
 		icons_enabled = true,
@@ -10,7 +14,10 @@ local opts = {
 
 	sections = {
 		lualine_a = { "mode" },
-		lualine_b = { "branch", "diff" },
+		lualine_b = {
+			{ "branch", icon = icons.git_repo.branch },
+			{ "diff", symbols = { added = git.added .. " ", modified = git.modified .. " ", removed = git.deleted .. " " } },
+		},
 
 		lualine_c = {
 			-- project root (from your config.project) + short filename
@@ -19,7 +26,7 @@ local opts = {
                 local root = (ok and project.project_root()) or (vim.uv or vim.loop).cwd()
 				return " " .. vim.fn.fnamemodify(root, ":~")
 			end,
-			{ "filename", path = 1, newfile_status = true, symbols = { modified = " [+]", readonly = " " } },
+			{ "filename", path = 1, newfile_status = true, symbols = { modified = " " .. icons.file.modified, readonly = icons.file.readonly .. " " } },
 		},
 
 		lualine_x = {
@@ -27,7 +34,7 @@ local opts = {
 				"diagnostics",
 				sources = { "nvim_diagnostic" },
 				sections = { "error", "warn", "info", "hint" },
-				symbols = { error = " ", warn = " ", info = " ", hint = " " },
+				symbols = { error = di.error .. " ", warn = di.warn .. " ", info = di.info .. " ", hint = di.hint .. " " },
 				update_in_insert = false,
 				always_visible = false,
 			},

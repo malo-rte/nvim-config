@@ -6,8 +6,13 @@ local DATA_DIR = vim.fn.stdpath("data") .. "/nerdfont"
 local MAP_PATH = DATA_DIR .. "/glyphnames.json"
 local CACHE_PATH = DATA_DIR .. "/mru_cache.json"
 local CACHE_SIZE = 200
-local CACHE_UPDATE_PERIOD = 7 * 24 * 60 * 60
-local REMOTE_URL = "https://raw.githubusercontent.com/ryanoasis/nerd-fonts/master/glyphnames.json"
+-- Pin the glyph mapping to a released Nerd Fonts tag, not `master`
+-- (DEV-TOOLS-DES-0004 §91: code points must not shift silently between
+-- releases). Keep this in sync with utils.icons M.nerd_font.mapping_version.
+local MAPPING_VERSION = "v3.4.0"
+local REMOTE_URL = "https://raw.githubusercontent.com/ryanoasis/nerd-fonts/"
+	.. MAPPING_VERSION
+	.. "/glyphnames.json"
 
 -- -------- Internal state -----------------------------------------------------------
 local map_loaded = false
@@ -189,13 +194,10 @@ local function should_update_now(force)
 	if force then
 		return true
 	end
-	local mt = file_mtime_secs(MAP_PATH)
-	if not mt then
-		-- no map on disk yet → do update
-		return true
-	end
-	local _now = os.time()
-	return (_now - mt) >= CACHE_UPDATE_PERIOD
+	-- Only fetch when there is no map on disk yet (first-run bootstrap). The
+	-- mapping is pinned (MAPPING_VERSION), so there is no periodic auto-refresh
+	-- that could shift code points; an explicit update(true) re-fetches the pin.
+	return file_mtime_secs(MAP_PATH) == nil
 end
 
 local function done(cb, ...)

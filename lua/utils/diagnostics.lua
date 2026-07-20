@@ -1,20 +1,18 @@
 local M = {}
 
-local diagnostic_signs = {
-    Error = "",
-    Warn = "",
-    Hint = "",
-    Info = "",
-}
+-- Severity glyphs come from the shared icon table so the sign column, the
+-- statusline, and the quickfix all render the same code points (DEV-TOOLS-DES-0004
+-- §86 semantic consistency).
+local icons = require("utils.icons").diagnostics
 
 M.setup = function ()
     vim.diagnostic.config({
         signs = {
             text = {
-                [vim.diagnostic.severity.ERROR] = diagnostic_signs.Error,
-                [vim.diagnostic.severity.WARN] = diagnostic_signs.Warn,
-                [vim.diagnostic.severity.INFO] = diagnostic_signs.Info,
-                [vim.diagnostic.severity.HINT] = diagnostic_signs.Hint,
+                [vim.diagnostic.severity.ERROR] = icons.error,
+                [vim.diagnostic.severity.WARN] = icons.warn,
+                [vim.diagnostic.severity.INFO] = icons.info,
+                [vim.diagnostic.severity.HINT] = icons.hint,
             },
         },
         virtual_text = false,

@@ -1,5 +1,24 @@
+local git = require("utils.icons").git
+
 local neotree_opts = {
 	close_if_last_window = true,
+
+	-- Per-file git glyphs from the shared icon table (DEV-TOOLS-DES-0004 §35).
+	default_component_configs = {
+		git_status = {
+			symbols = {
+				added = git.added,
+				modified = git.modified,
+				deleted = git.deleted,
+				renamed = git.renamed,
+				untracked = git.untracked,
+				ignored = git.ignored,
+				unstaged = git.unstaged,
+				staged = git.staged,
+				conflict = git.conflict,
+			},
+		},
+	},
 
 	event_handlers = {
 		{

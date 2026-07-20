@@ -63,7 +63,9 @@ return {
 		opts = {
 			view = {
 				style = "sign",
-				signs = { add = "▎", change = "▎", delete = "" },
+				-- add/change stay as gutter bars; delete uses the spec removed
+				-- glyph from the shared icon table (DEV-TOOLS-DES-0004 §35).
+				signs = { add = "▎", change = "▎", delete = require("utils.icons").git.deleted },
 			},
 			-- mappings left at sensible defaults: gh/gH apply/reset, [h ]h nav.
 		},

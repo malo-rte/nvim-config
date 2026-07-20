@@ -1,3 +1,6 @@
+local icons = require("utils.icons")
+local di = icons.diagnostics
+
 return {
 	"stevearc/quicker.nvim",
 	ft = "qf",
@@ -61,11 +64,11 @@ return {
 
 			-- Map of quickfix item type to icon
 			type_icons = {
-				E = "󰅚 ",
-				W = "󰀪 ",
-				I = " ",
-				N = " ",
-				H = " ",
+				E = di.error .. " ",
+				W = di.warn .. " ",
+				I = di.info .. " ",
+				N = di.info .. " ",
+				H = di.hint .. " ",
 			},
 
 			-- Border characters
