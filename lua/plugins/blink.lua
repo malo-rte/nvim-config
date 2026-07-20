@@ -1,4 +1,6 @@
 -- lua/plugins/blink.lua
+local icons = require("utils.icons")
+
 return {
   "Saghen/blink.cmp",
   version = "1.*",
@@ -6,13 +8,7 @@ return {
   opts = {
     appearance = {
       nerd_font_variant = "mono",
-      kind_icons = {
-        Function = "󰊕",
-        Method = "󰊕",
-        Variable = "󰆦",
-        Class = "󱡠",
-        Interface = "󱡠",
-      },
+      kind_icons = icons.lsp_kind,
     },
 
     keymap = {

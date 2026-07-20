@@ -73,4 +73,37 @@ M.file = {
 	modified = "[+]",
 }
 
+-- LSP completion / symbol kinds (blink.cmp). Not governed by
+-- DEV-TOOLS-DES-0004 (it defines no completion-kind vocabulary), but kept
+-- here as the single source of truth. Function/Method use md-function_variant
+-- (U+F0871) rather than md-function (U+F0295) to avoid clashing with the
+-- .sig/.sign file glyph in ftype_icons (§29).
+M.lsp_kind = {
+	Text = "󰉿",
+	Method = "󰡱",
+	Function = "󰡱",
+	Constructor = "󰒓",
+	Field = "󰜢",
+	Variable = "󰆦",
+	Property = "󰖷",
+	Class = "󱡠",
+	Interface = "󱡠",
+	Struct = "󱡠",
+	Module = "󰅩",
+	Unit = "󰪚",
+	Value = "󰦨",
+	Enum = "󰦨",
+	EnumMember = "󰦨",
+	Keyword = "󰻾",
+	Constant = "󰏿",
+	Snippet = "󱄽",
+	Color = "󰏘",
+	File = "󰈔",
+	Reference = "󰬲",
+	Folder = "󰉋",
+	Event = "󱐋",
+	Operator = "󰪚",
+	TypeParameter = "󰬛",
+}
+
 return M
