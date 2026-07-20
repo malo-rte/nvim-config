@@ -1,0 +1,3039 @@
+= Nerd Font Icon System: Design Reference
+:doc-id:        DEV-TOOLS-DES-0004
+:doc-title:     nerd font icon system -- design reference
+:doc-version:   0.3
+:doc-status:    Draft
+:doc-date:      2026-07-13
+:doc-authors:   Mats Loman <mats.loman@rte.se>
+:doc-reviewers:
+:doc-approvers:
+:revnumber:     {doc-version}
+:revdate:       {doc-date}
+:revremark:     {doc-id}
+:title-page:
+:doctype:       book
+:toc:           left
+:toclevels:     3
+:sectnumlevels: 4
+:icons:         font
+:source-highlighter: rouge
+:experimental:
+
+[abstract]
+== Abstract
+
+This document is the *shared Nerd Font icon system for the dev-tools suite*. It
+fixes how the suite's user interfaces choose the glyph for an object and how they
+render the independent status overlays that sit beside it. It is a reference: the
+tables are the specification.
+
+The system spans three parts:
+
+. *File manager icons* -- the primary type icon for a filesystem object plus the
+  filesystem, permission, Git, and backup status overlays shown beside it.
+. *Status application icons* -- the module glyphs a status bar such as Waybar
+  shows for workspaces, clock, CPU, memory, battery, audio, network, and the
+  other system-state modules.
+. *Cross-application design rules* -- the semantics, precedence, color,
+  accessibility, versioning, override, and configuration policy every consumer
+  shares so one meaning maps to one glyph everywhere.
+
+The system is suite-wide, not tied to one program. Its consumers are the `wfm`
+workspace file manager
+(xref:../../architecture/DEV-TOOLS-ARCH-0012-file-manager/DEV-TOOLS-ARCH-0012-file-manager.adoc[DEV-TOOLS-ARCH-0012]),
+the maintainer's Neovim configuration, the Waybar status bar, and the
+filetype-to-icon exporters that emit configurations for third-party tools. Every
+consumer resolves the same rule data, so a file shows the same icon in the file
+manager, the editor, and a directory listing, and a system state shows the same
+icon in the file manager and the status bar.
+
+== Introduction
+
+A dev-tools user interface shows an object -- a file, or a system-state module --
+with a primary glyph and, in separate positions, a set of status overlays. This
+reference specifies both, for file managers and for status applications, and the
+design rules common to both.
+
+For a filesystem object it separates five independent layers, each resolved on
+its own:
+
+. *Primary type icon* -- the object's kind, filename, extension, or detected
+  content.
+. *Filesystem-object state* -- symlink, mount point, hardware or device node.
+. *Permission and diagnostic state* -- unreadable, broken link, operation error.
+. *Version-control state* -- per-file Git status and repository chrome.
+. *Backup state* -- inclusion in a backup set and freshness.
+
+The layers do not overwrite one another. The type icon names *what the object
+is*; the status overlays name *what is currently true about it*. A consumer that
+shows all five reserves a column per status layer; a consumer with less width
+drops whole columns (<<_recommended_tui_layout>>) rather than merging their
+meanings into the type icon. The status-application part applies the same
+separation: a module's icon names the resource, and its state (warning, error,
+disconnected) is a distinct overlay drawn from one shared semantic vocabulary
+(<<_78_common_alert_vocabulary>>, <<_86_semantic_consistency>>).
+
+Glyph identifiers in this document use Nerd Font class names
+(`nf-md-*`, `nf-oct-*`, `nf-cod-*`, `nf-fa-*`, `nf-seti-*`, `nf-custom-*`). The
+exact code point behind a name varies between Nerd Font releases, so a consumer
+pins a glyph mapping version and treats the rule data as external configuration,
+never as compiled-in constants (<<_91_nerd_font_version_policy>>,
+<<_94_user_override_model>>).
+
+== Scope
+
+In scope: the rule precedence; the icon assignments for filesystem objects,
+directories, exact filenames, compound and simple extensions, and detected
+content; the four file-manager status-overlay sets; the status-application module
+icons and their states (Waybar and comparable bars); the recommended layouts for
+full, compact, and minimal widths; the matching algorithm; extension
+normalization; icon-width handling; the ASCII fallback sets; the shared semantic,
+color, accessibility, versioning, override, validation, and configuration
+policy; and the recommended defaults.
+
+Out of scope: the requirements a consuming tool must meet and the structure of
+any one consumer (those live in that tool's own requirement and architecture
+specs, for example
+xref:../../architecture/DEV-TOOLS-ARCH-0012-file-manager/DEV-TOOLS-ARCH-0012-file-manager.adoc[DEV-TOOLS-ARCH-0012]);
+the mechanism that detects Git status, reads system sensors, or computes backup
+inclusion; the byte-level content-detection engine beyond the extents this
+reference bounds; and the specific values of a color theme, which supplements
+icons but is defined elsewhere.
+
+== How to read this reference
+
+Each numbered section is a rule group. Most groups are a table: the left columns
+name the object, state, module, or pattern being matched, and the right columns
+give the glyph and its Nerd Font class name. Prose refers to a group by its
+number (``§45`` means <<_45_matching_algorithm>>). Where a section fixes an
+algorithm or a policy -- precedence (<<_1_rule_precedence>>), matching
+(<<_45_matching_algorithm>>), normalization (<<_46_extension_normalization>>),
+state precedence (<<_87_state_precedence>>), version policy
+(<<_91_nerd_font_version_policy>>) -- the rules are normative for a consumer that
+claims to implement this system; the specific glyph choices are recommendations a
+consumer may override through its configuration (<<_94_user_override_model>>).
+
+The reference is one document; <<_111_recommended_document_organization>> notes
+how it may later be split into semantics, file-manager, and status-application
+parts for maintenance without changing the rules.
+
+== 1. Rule precedence
+
+Evaluate icon rules in this order:
+
+[%autowidth, options="header"]
+|===
+| Priority | Rule source | Example
+| 1 | Special filesystem object | Socket, FIFO, block device
+| 2 | Broken symbolic link | Link target does not exist
+| 3 | Exact filename | `Makefile`, `Cargo.toml`, `.gitignore`
+| 4 | Compound extension | `.tar.gz`, `.d.ts`, `.dtso`
+| 5 | Simple extension | `.rs`, `.pdf`, `.png`
+| 6 | Detected MIME or content | Text, image, archive
+| 7 | Executable bit or binary inspection | ELF executable, script
+| 8 | Generic fallback | Unknown file
+|===
+
+
+Do not replace the primary type icon with Git, backup, permission, or error icons. Those states should use separate columns.
+
+== Primary filesystem objects
+
+=== 2. Generic files and directories
+
+[%autowidth, options="header"]
+|===
+| Object | Icon | Nerd Font name | Recommended use
+| Generic file |  | `nf-cod-file` | Unknown regular file
+| Text file |  | `nf-fa-file_text_o` | Unknown readable text
+| Source code |  | `nf-cod-file_code` | Unknown source file
+| Binary data |  | `nf-cod-file_binary` | Unknown binary
+| Executable |  | `nf-oct-terminal` | Native executable
+| Script |  | `nf-dev-terminal` | Interpreted executable
+| Directory |  | `nf-cod-folder` | Closed directory
+| Open directory |  | `nf-cod-folder_opened` | Expanded directory
+| Empty directory |  | `nf-fa-folder_o` | Optional distinction
+| Directory symlink |  | `nf-cod-file_symlink_directory` | Symlink to directory
+| File symlink |  | `nf-cod-file_symlink_file` | Symlink to file
+| Broken symlink | 󰌺 | `nf-md-link_off` | Missing target
+| Submodule |  | `nf-cod-file_submodule` | Git submodule
+| Hidden file | 󰈉 | `nf-md-file_hidden` | Optional type distinction
+| Unknown object |  | `nf-fa-question` | Unsupported object type
+|===
+
+
+Use the normal target-type icon for valid symlinks when icon space is limited, then indicate the link in a separate state column.
+
+=== 3. Special Unix filesystem objects
+
+[%autowidth, options="header"]
+|===
+| Object | Icon | Nerd Font name | Linux test
+| Character device |  | `nf-cod-chip` | `S_IFCHR`
+| Block device |  | `nf-fa-hdd_o` | `S_IFBLK`
+| Socket | 󰖩 | `nf-md-lan_connect` | `S_IFSOCK`
+| FIFO or named pipe | 󰟥 | `nf-md-pipe` | `S_IFIFO`
+| Mount point | 󰋊 | `nf-md-harddisk` | Different filesystem ID
+| Filesystem root | 󰋊 | `nf-md-harddisk` | `/`
+| Procfs entry |  | `nf-fa-microchip` | Under `/proc`
+| Sysfs entry |  | `nf-cod-chip` | Under `/sys`
+| Cgroup entry | 󰘚 | `nf-md-file_tree` | Under cgroup filesystem
+|===
+
+
+== Directory rules
+
+=== 4. Standard user directories
+
+[%autowidth, options="header"]
+|===
+| Directory name or role | Icon | Nerd Font name
+| Home |  | `nf-fa-home`
+| Desktop |  | `nf-fa-desktop`
+| Documents |  | `nf-fa-file_text`
+| Downloads |  | `nf-fa-download`
+| Pictures |  | `nf-fa-image`
+| Music |  | `nf-fa-music`
+| Videos |  | `nf-fa-video_camera`
+| Public | 󰀀 | `nf-md-account_group`
+| Templates |  | `nf-cod-file`
+| Trash |  | `nf-fa-trash`
+| Temporary directory | 󰃰 | `nf-md-file_clock_outline`
+| Backup directory | 󰁯 | `nf-md-backup_restore`
+| Archive directory |  | `nf-fa-archive`
+| Mounted media |  | `nf-fa-hdd_o`
+| Network share | 󰖩 | `nf-md-lan_connect`
+|===
+
+
+=== 5. Development directories
+
+[%autowidth, options="header"]
+|===
+| Directory names | Icon | Nerd Font name
+| `.git` |  | `nf-custom-folder_git`
+| `.github`, `.gitlab` |  | `nf-cod-github`
+| `src`, `source`, `Sources` | 󰲋 | `nf-md-folder_code`
+| `include`, `inc`, `headers` |  | `nf-fa-file_code_o`
+| `lib`, `libs`, `library` |  | `nf-cod-folder_library`
+| `bin`, `sbin` |  | `nf-oct-terminal`
+| `build`, `out`, `target` |  | `nf-fa-cogs`
+| `dist`, `release` |  | `nf-oct-package`
+| `debug` |  | `nf-cod-debug`
+| `test`, `tests`, `spec` |  | `nf-cod-beaker`
+| `fixtures`, `testdata` |  | `nf-cod-beaker`
+| `docs`, `doc`, `documentation` |  | `nf-cod-book`
+| `examples`, `samples` |  | `nf-cod-code`
+| `scripts`, `tools` |  | `nf-cod-gear`
+| `config`, `.config` |  | `nf-custom-folder_config`
+| `.cache`, `cache` | 󰃨 | `nf-md-cached`
+| `vendor`, `third_party` | 󰏗 | `nf-md-package_variant`
+| `node_modules` |  | `nf-dev-nodejs_small`
+| `.venv`, `venv` |  | `nf-dev-python`
+| `.cargo` |  | `nf-dev-rust`
+| `.docker` |  | `nf-dev-docker`
+| `.devcontainer` |  | `nf-oct-container`
+|===
+
+
+=== 6. Embedded and hardware directories
+
+[%autowidth, options="header"]
+|===
+| Directory names | Icon | Nerd Font name
+| `firmware`, `fw` |  | `nf-fa-microchip`
+| `boot`, `bootloader` | 󰀻 | `nf-md-rocket_launch`
+| `kernel`, `linux` |  | `nf-fa-linux`
+| `drivers` |  | `nf-cod-chip`
+| `dts`, `devicetree` | 󰘚 | `nf-md-file_tree`
+| `fpga`, `hdl`, `rtl` |  | `nf-cod-circuit_board`
+| `schematic`, `schematics` | 󰐕 | `nf-md-transistor`
+| `pcb`, `layout` |  | `nf-cod-circuit_board`
+| `gerber`, `gerbers` |  | `nf-cod-circuit_board`
+| `hardware`, `hw` |  | `nf-cod-circuit_board`
+| `yocto`, `layers` |  | `nf-fa-linux`
+| `recipes` |  | `nf-oct-package`
+| `rootfs` |  | `nf-fa-hdd_o`
+|===
+
+
+== Exact filename rules
+
+Exact filenames should take precedence over extension rules.
+
+=== 7. Documentation and project metadata
+
+[%autowidth, options="header"]
+|===
+| Filename | Icon | Nerd Font name
+| `README`, `README.*` |  | `nf-cod-book`
+| `CHANGELOG`, `CHANGES`, `NEWS` |  | `nf-cod-history`
+| `LICENSE`, `LICENCE`, `COPYING` |  | `nf-cod-law`
+| `AUTHORS`, `CONTRIBUTORS` | 󰀀 | `nf-md-account_group`
+| `CODEOWNERS` | 󰀀 | `nf-md-account_group`
+| `TODO`, `TODO.*` |  | `nf-seti-todo`
+| `SECURITY.md` | 󰒃 | `nf-md-shield_check`
+| `CONTRIBUTING.md` |  | `nf-cod-github`
+| `VERSION` |  | `nf-fa-tag`
+| `MANIFEST` |  | `nf-cod-checklist`
+|===
+
+
+=== 8. Git and source-control files
+
+[%autowidth, options="header"]
+|===
+| Filename or pattern | Icon | Nerd Font name
+| `.gitignore` |  | `nf-dev-git`
+| `.gitattributes` |  | `nf-dev-git`
+| `.gitmodules` |  | `nf-cod-file_submodule`
+| `.gitconfig` |  | `nf-dev-git`
+| `.mailmap` |  | `nf-dev-git`
+| `.hgignore`, `.hgrc` | 󰘬 | `nf-md-source_repository`
+| `.svnignore` | 󰘬 | `nf-md-source_repository`
+|===
+
+
+=== 9. Build systems
+
+[%autowidth, options="header"]
+|===
+| Filename | Icon | Nerd Font name
+| `Makefile`, `GNUmakefile` |  | `nf-seti-makefile`
+| `CMakeLists.txt` |  | `nf-seti-cmake`
+| `meson.build`, `meson_options.txt` | 󰔷 | `nf-md-hammer_wrench`
+| `build.ninja` | 󰝴 | `nf-md-ninja`
+| `SConstruct`, `SConscript` | 󰔷 | `nf-md-hammer_wrench`
+| `BUILD`, `BUILD.bazel`, `WORKSPACE` | 󰔷 | `nf-md-hammer_wrench`
+| `Justfile`, `justfile` | 󰔷 | `nf-md-hammer_wrench`
+| `Taskfile.yml` |  | `nf-cod-checklist`
+| `Rakefile` |  | `nf-dev-ruby`
+| `Gradle`, `build.gradle` |  | `nf-seti-gradle`
+| `pom.xml` |  | `nf-dev-java`
+| `build.xml` |  | `nf-dev-java`
+|===
+
+
+=== 10. Language package and dependency files
+
+[%autowidth, options="header"]
+|===
+| Filename | Icon | Nerd Font name
+| `Cargo.toml`, `Cargo.lock` |  | `nf-dev-rust`
+| `package.json`, `package-lock.json` |  | `nf-dev-nodejs_small`
+| `yarn.lock` |  | `nf-seti-yarn`
+| `pnpm-lock.yaml` |  | `nf-dev-nodejs_small`
+| `deno.json`, `deno.jsonc` |  | `nf-dev-denojs`
+| `pyproject.toml` |  | `nf-dev-python`
+| `requirements.txt` |  | `nf-dev-python`
+| `Pipfile`, `Pipfile.lock` |  | `nf-dev-python`
+| `poetry.lock` |  | `nf-dev-python`
+| `setup.py`, `setup.cfg` |  | `nf-dev-python`
+| `go.mod`, `go.sum`, `go.work` |  | `nf-seti-go`
+| `Gemfile`, `Gemfile.lock` |  | `nf-dev-ruby`
+| `composer.json`, `composer.lock` |  | `nf-dev-php`
+| `mix.exs`, `mix.lock` |  | `nf-custom-elixir`
+| `rebar.config`, `rebar.lock` |  | `nf-dev-erlang`
+| `pubspec.yaml`, `pubspec.lock` |  | `nf-dev-dart`
+|===
+
+
+=== 11. Containers and CI
+
+[%autowidth, options="header"]
+|===
+| Filename | Icon | Nerd Font name
+| `Dockerfile`, `Containerfile` |  | `nf-dev-docker`
+| `docker-compose.yml`, `compose.yml` |  | `nf-dev-docker`
+| `.dockerignore` |  | `nf-dev-docker`
+| `.containerignore` |  | `nf-oct-container`
+| `.gitlab-ci.yml` |  | `nf-fa-gitlab`
+| `.travis.yml` |  | `nf-dev-travis`
+| `Jenkinsfile` |  | `nf-dev-jenkins`
+| `Vagrantfile` |  | `nf-fa-vimeo`
+| `Tiltfile` |  | `nf-oct-container`
+| `Earthfile` |  | `nf-oct-container`
+|===
+
+
+=== 12. Shell and environment files
+
+[%autowidth, options="header"]
+|===
+| Filename | Icon | Nerd Font name
+| `.bashrc`, `.bash_profile`, `.bash_logout` |  | `nf-dev-terminal`
+| `.zshrc`, `.zprofile`, `.zlogin` |  | `nf-dev-terminal`
+| `.profile` |  | `nf-dev-terminal`
+| `.config/fish/config.fish` |  | `nf-md-fish`
+| `.env`, `.env.*` |  | `nf-oct-file_code`
+| `.editorconfig` |  | `nf-seti-config`
+| `.direnv`, `.envrc` |  | `nf-oct-file_code`
+| `.tmux.conf` |  | `nf-cod-terminal_tmux`
+| `.inputrc` |  | `nf-dev-terminal`
+|===
+
+
+== Extension-based type rules
+
+=== 13. C, C++ and systems programming
+
+[%autowidth, options="header"]
+|===
+| Extensions | Icon | Nerd Font name
+| `.c` |  | `nf-dev-c`
+| `.h` |  | `nf-fa-file_code_o`
+| `.cc`, `.cpp`, `.cxx`, `.c++` |  | `nf-dev-cplusplus`
+| `.hh`, `.hpp`, `.hxx`, `.h++` |  | `nf-dev-cplusplus`
+| `.m` |  | `nf-dev-c`
+| `.mm` |  | `nf-dev-cplusplus`
+| `.rs` |  | `nf-dev-rust`
+| `.go` |  | `nf-seti-go`
+| `.zig`, `.zir` |  | `nf-seti-zig`
+| `.d` |  | `nf-dev-dlang`
+| `.nim`, `.nims` |  | `nf-seti-nim`
+| `.v`, `.odin` |  | `nf-cod-file_code`
+| `.asm`, `.s`, `.S` |  | `nf-seti-asm`
+| `.inc` |  | `nf-fa-file_code_o`
+| `.ld`, `.lds` |  | `nf-cod-file_code`
+| `.map` | 󰘚 | `nf-md-file_tree`
+|===
+
+
+=== 14. Scripting languages
+
+[%autowidth, options="header"]
+|===
+| Extensions | Icon | Nerd Font name
+| `.py`, `.pyw`, `.pyi` |  | `nf-dev-python`
+| `.rb`, `.rake` |  | `nf-dev-ruby`
+| `.pl`, `.pm`, `.t` |  | `nf-seti-perl`
+| `.php`, `.php3`, `.php4`, `.php5`, `.phtml` |  | `nf-dev-php`
+| `.lua`, `.luau` |  | `nf-seti-lua`
+| `.tcl`, `.tk` |  | `nf-cod-file_code`
+| `.r`, `.R`, `.rmd` | 󰟔 | `nf-md-language_r`
+| `.jl` |  | `nf-seti-julia`
+| `.groovy`, `.gvy` |  | `nf-dev-groovy`
+| `.awk` |  | `nf-dev-terminal`
+| `.sed` |  | `nf-dev-terminal`
+|===
+
+
+=== 15. Shell and command files
+
+[%autowidth, options="header"]
+|===
+| Extensions | Icon | Nerd Font name
+| `.sh`, `.bash` |  | `nf-dev-terminal`
+| `.zsh` |  | `nf-dev-terminal`
+| `.fish` |  | `nf-md-fish`
+| `.ksh`, `.csh`, `.tcsh` |  | `nf-dev-terminal`
+| `.ps1`, `.psm1`, `.psd1` | 󰨊 | `nf-md-powershell`
+| `.bat`, `.cmd` |  | `nf-custom-windows`
+| `.nu` |  | `nf-dev-terminal`
+| `.expect`, `.exp` |  | `nf-dev-terminal`
+|===
+
+
+=== 16. Web development
+
+[%autowidth, options="header"]
+|===
+| Extensions | Icon | Nerd Font name
+| `.html`, `.htm`, `.xhtml` |  | `nf-dev-html5`
+| `.css` |  | `nf-dev-css3`
+| `.scss`, `.sass` |  | `nf-dev-sass`
+| `.less` |  | `nf-dev-less`
+| `.js`, `.mjs`, `.cjs` |  | `nf-dev-javascript`
+| `.jsx` |  | `nf-dev-react`
+| `.ts`, `.mts`, `.cts` |  | `nf-seti-typescript`
+| `.tsx` |  | `nf-dev-react`
+| `.vue` |  | `nf-seti-vue`
+| `.svelte` |  | `nf-seti-svelte`
+| `.astro` |  | `nf-seti-astro`
+| `.wasm`, `.wat` |  | `nf-seti-wasm`
+|===
+
+
+=== 17. Markup and structured data
+
+[%autowidth, options="header"]
+|===
+| Extensions | Icon | Nerd Font name
+| `.md`, `.markdown`, `.mdown` |  | `nf-dev-markdown`
+| `.rst` |  | `nf-fa-file_text_o`
+| `.adoc`, `.asciidoc` |  | `nf-fa-file_text_o`
+| `.org` |  | `nf-seti-org`
+| `.tex`, `.ltx`, `.sty`, `.cls` |  | `nf-seti-tex`
+| `.bib` |  | `nf-cod-book`
+| `.json`, `.jsonc`, `.json5` |  | `nf-seti-json`
+| `.yaml`, `.yml` |  | `nf-seti-yml`
+| `.toml` |  | `nf-seti-toml`
+| `.xml`, `.xsd`, `.xsl`, `.xslt` | 󰗀 | `nf-md-xml`
+| `.ini`, `.cfg`, `.conf`, `.cnf` |  | `nf-seti-config`
+| `.properties` |  | `nf-seti-config`
+| `.csv`, `.tsv` |  | `nf-seti-csv`
+| `.desktop` |  | `nf-fa-desktop`
+| `.service`, `.socket`, `.target`, `.timer` |  | `nf-seti-config`
+|===
+
+
+== Documents and media
+
+=== 18. Office and document formats
+
+[%autowidth, options="header"]
+|===
+| Extensions | Icon | Nerd Font name
+| `.pdf` |  | `nf-cod-file_pdf`
+| `.doc`, `.docx`, `.docm`, `.odt` |  | `nf-fa-file_word_o`
+| `.xls`, `.xlsx`, `.xlsm`, `.ods` |  | `nf-fa-file_excel_o`
+| `.ppt`, `.pptx`, `.pptm`, `.odp` |  | `nf-fa-file_powerpoint_o`
+| `.rtf` | 󰈙 | `nf-md-file_document_outline`
+| `.epub`, `.mobi`, `.azw`, `.azw3`, `.fb2` |  | `nf-fae-book_open_o`
+| `.djvu` |  | `nf-cod-book`
+|===
+
+
+=== 19. Images and graphics
+
+[%autowidth, options="header"]
+|===
+| Extensions | Icon | Nerd Font name
+| `.png`, `.apng` |  | `nf-fa-file_image_o`
+| `.jpg`, `.jpeg`, `.jpe` |  | `nf-fa-image`
+| `.gif`, `.webp`, `.avif`, `.jxl`, `.heic`, `.heif` |  | `nf-fa-file_image_o`
+| `.bmp`, `.dib`, `.tif`, `.tiff` |  | `nf-fa-file_image_o`
+| `.ico`, `.icns` |  | `nf-seti-image`
+| `.raw`, `.dng`, `.cr2`, `.cr3`, `.nef`, `.arw` |  | `nf-fa-camera`
+| `.svg`, `.svgz` | 󰕙 | `nf-md-svg`
+| `.ai`, `.eps`, `.xcf`, `.psd`, `.kra`, `.ora` |  | `nf-fa-paint_brush`
+| `.dxf`, `.dwg` | 󰻫 | `nf-md-vector_square`
+| `.step`, `.stp`, `.iges`, `.igs` | 󰆧 | `nf-md-cube_outline`
+| `.stl`, `.obj`, `.fbx`, `.gltf`, `.glb` | 󰆧 | `nf-md-cube_outline`
+| `.blend` | 󰂫 | `nf-md-blender_software`
+|===
+
+
+=== 20. Audio and video
+
+[%autowidth, options="header"]
+|===
+| Extensions | Icon | Nerd Font name
+| `.mp3`, `.mp2` |  | `nf-fa-file_audio_o`
+| `.flac`, `.wav`, `.aiff`, `.ogg`, `.opus`, `.aac`, `.m4a` |  | `nf-fa-music`
+| `.mid`, `.midi` | 󰣖 | `nf-md-music_note`
+| `.m3u`, `.m3u8`, `.pls`, `.xspf` | 󰲸 | `nf-md-playlist_music`
+| `.mp4`, `.m4v`, `.mov` |  | `nf-fa-file_video_o`
+| `.mkv`, `.webm`, `.avi`, `.mpeg`, `.mpg` |  | `nf-fa-film`
+| `.wmv`, `.flv`, `.ogv`, `.3gp` |  | `nf-fa-film`
+| `.srt`, `.vtt`, `.ass`, `.ssa`, `.sub` | 󰨖 | `nf-md-subtitles_outline`
+|===
+
+
+The `.ts` extension requires content or context detection because it can mean TypeScript or an MPEG transport stream.
+
+== Archives, packages, and disk images
+
+=== 21. Archives and compression
+
+[%autowidth, options="header"]
+|===
+| Extensions | Icon | Nerd Font name
+| `.zip`, `.zipx` |  | `nf-cod-file_zip`
+| `.tar` |  | `nf-oct-package`
+| `.tar.gz`, `.tgz` |  | `nf-oct-file_zip`
+| `.tar.bz2`, `.tbz`, `.tbz2` |  | `nf-oct-file_zip`
+| `.tar.xz`, `.txz` |  | `nf-oct-file_zip`
+| `.tar.zst`, `.tzst` |  | `nf-oct-file_zip`
+| `.gz`, `.bz2`, `.xz`, `.zst`, `.lz`, `.lz4`, `.lzo` |  | `nf-oct-file_zip`
+| `.7z`, `.rar`, `.ace` |  | `nf-fa-archive`
+| `.cpio` |  | `nf-oct-package`
+| `.ar`, `.a` |  | `nf-cod-library`
+|===
+
+
+=== 22. Operating-system packages
+
+[%autowidth, options="header"]
+|===
+| Extensions | Icon | Nerd Font name
+| `.deb`, `.udeb` |  | `nf-dev-debian`
+| `.rpm` |  | `nf-linux-redhat`
+| `.pkg.tar.zst`, `.pkg.tar.xz` |  | `nf-linux-archlinux`
+| `.apk` when Alpine package |  | `nf-linux-alpine`
+| `.snap` |  | `nf-linux-ubuntu`
+| `.flatpak`, `.flatpakref` |  | `nf-oct-container`
+| `.appimage` |  | `nf-fa-linux`
+| `.whl`, `.egg` |  | `nf-dev-python`
+| `.crate` |  | `nf-dev-rust`
+|===
+
+
+=== 23. Disk, filesystem, and virtual-machine images
+
+[%autowidth, options="header"]
+|===
+| Extensions | Icon | Nerd Font name
+| `.iso`, `.udf` |  | `nf-fae-disc`
+| `.img`, `.raw`, `.dd` |  | `nf-fa-hdd_o`
+| `.wic`, `.wic.bz2`, `.wic.zst` |  | `nf-fa-hdd_o`
+| `.qcow`, `.qcow2`, `.qed` | 󰋊 | `nf-md-harddisk`
+| `.vdi`, `.vhd`, `.vhdx`, `.vmdk` | 󰋊 | `nf-md-harddisk`
+| `.ova`, `.ovf` |  | `nf-oct-container`
+| `.squashfs`, `.sqfs` |  | `nf-fa-hdd_o`
+| `.ext2`, `.ext3`, `.ext4`, `.btrfs` |  | `nf-fa-hdd_o`
+| `.jffs2`, `.ubifs`, `.ubi` |  | `nf-fa-microchip`
+| `.erofs`, `.cramfs` |  | `nf-fa-hdd_o`
+| `.dmg` |  | `nf-dev-apple`
+| `.wim`, `.esd` |  | `nf-custom-windows`
+|===
+
+
+== Executables, libraries, and debug files
+
+=== 24. Native program artifacts
+
+[%autowidth, options="header"]
+|===
+| Extensions or detection | Icon | Nerd Font name
+| ELF executable |  | `nf-oct-terminal`
+| PE executable, `.exe` |  | `nf-custom-windows`
+| macOS Mach-O executable |  | `nf-dev-apple`
+| `.run`, `.bin` when executable |  | `nf-oct-terminal`
+| `.o`, `.obj` |  | `nf-cod-file_binary`
+| `.a`, `.lib` |  | `nf-cod-library`
+| `.so`, `.so.*`, `.dll`, `.dylib` |  | `nf-cod-library`
+| `.ko`, `.ko.xz`, `.ko.zst` |  | `nf-fa-linux`
+| `.pdb`, `.dSYM`, `.debug` |  | `nf-cod-debug`
+| Core dump, `core`, `core.*` |  | `nf-cod-error`
+|===
+
+
+Prefer binary-format detection over extension for ELF, PE, and Mach-O files.
+
+== Embedded systems and electronics
+
+=== 25. Firmware and boot artifacts
+
+[%autowidth, options="header"]
+|===
+| Extensions or filenames | Icon | Nerd Font name
+| Generic firmware `.fw`, `.firmware` |  | `nf-fa-microchip`
+| Raw firmware `.bin` |  | `nf-fa-microchip`
+| Intel HEX `.hex`, `.ihex` | 󰘚 | `nf-md-memory`
+| Motorola S-record `.srec`, `.s19`, `.s28`, `.s37`, `.mot` | 󰘚 | `nf-md-memory`
+| UF2 `.uf2` |  | `nf-fa-microchip`
+| DFU `.dfu` |  | `nf-fa-microchip`
+| U-Boot image `.uimg` | 󰀻 | `nf-md-rocket_launch`
+| FIT image `.itb` | 󰀻 | `nf-md-rocket_launch`
+| FIT source `.its` | 󰘚 | `nf-md-file_tree`
+| Flattened device tree `.dtb` | 󰘚 | `nf-md-file_tree`
+| Device tree source `.dts` | 󰘚 | `nf-md-file_tree`
+| Device tree include `.dtsi` | 󰙅 | `nf-md-file_tree_outline`
+| Device tree overlay `.dtbo`, `.dtso` | 󰘚 | `nf-md-file_tree`
+| Kernel image `Image`, `zImage`, `uImage`, `bzImage` |  | `nf-fa-linux`
+| Initramfs `.cpio`, `.cpio.gz`, `.cpio.zst` |  | `nf-oct-package`
+| UEFI executable `.efi` | 󰌢 | `nf-md-monitor`
+| Trusted firmware `.fip` | 󰒃 | `nf-md-shield_check`
+| Boot ROM image `.rom` |  | `nf-fa-microchip`
+|===
+
+
+=== 26. HDL, FPGA, and programmable logic
+
+[%autowidth, options="header"]
+|===
+| Extensions | Icon | Nerd Font name
+| `.v`, `.vh` |  | `nf-cod-circuit_board`
+| `.sv`, `.svh` |  | `nf-cod-circuit_board`
+| `.vhd`, `.vhdl` |  | `nf-cod-circuit_board`
+| `.xdc`, `.ucf`, `.sdc` |  | `nf-seti-config`
+| `.qsf`, `.qpf` |  | `nf-seti-config`
+| `.lpf`, `.pcf` constraints |  | `nf-seti-config`
+| `.bit`, `.sof`, `.pof`, `.rbf` |  | `nf-cod-circuit_board`
+| `.jed`, `.jedec` |  | `nf-cod-circuit_board`
+| `.mcs`, `.svf`, `.xsvf` |  | `nf-cod-circuit_board`
+| `.vcd`, `.fst`, `.wlf` | 󰍛 | `nf-md-chart_timeline_variant`
+| `.gtkw` | 󰍛 | `nf-md-chart_timeline_variant`
+|===
+
+
+=== 27. EDA and electronics
+
+[%autowidth, options="header"]
+|===
+| Extensions | Icon | Nerd Font name
+| KiCad schematic `.kicad_sch` | 󰐕 | `nf-md-transistor`
+| KiCad PCB `.kicad_pcb` |  | `nf-cod-circuit_board`
+| KiCad project `.kicad_pro` |  | `nf-cod-circuit_board`
+| Legacy KiCad `.sch`, `.brd` |  | `nf-cod-circuit_board`
+| Gerber `.gbr`, `.ger`, `.gtl`, `.gbl`, `.gts`, `.gbs` |  | `nf-cod-circuit_board`
+| Drill `.drl`, `.xln` |  | `nf-cod-circuit_board`
+| SPICE `.cir`, `.sp`, `.spice` | 󰘚 | `nf-md-sine_wave`
+| LTspice `.asc`, `.asy` | 󰐕 | `nf-md-transistor`
+| BOM `.bom` |  | `nf-cod-checklist`
+| Pick-and-place `.pos`, `.pnp` |  | `nf-cod-circuit_board`
+|===
+
+
+=== 28. Embedded build systems
+
+[%autowidth, options="header"]
+|===
+| Filename or extension | Icon | Nerd Font name
+| `Kconfig`, `Kconfig.*` |  | `nf-fa-linux`
+| `.config` in kernel or BusyBox tree |  | `nf-fa-linux`
+| `defconfig`, `*_defconfig` |  | `nf-fa-linux`
+| `.bb`, `.bbappend`, `.bbclass` |  | `nf-fa-linux`
+| `.inc` in BitBake layer |  | `nf-fa-linux`
+| `.wks`, `.wks.in` |  | `nf-fa-hdd_o`
+| `kas*.yml`, `kas*.yaml` |  | `nf-fa-linux`
+| `west.yml` |  | `nf-fa-microchip`
+| `prj.conf` |  | `nf-fa-microchip`
+| `CMakePresets.json` |  | `nf-seti-cmake`
+| `platformio.ini` |  | `nf-fa-microchip`
+| `sdkconfig`, `sdkconfig.*` |  | `nf-fa-microchip`
+| `.overlay` in Zephyr tree | 󰘚 | `nf-md-file_tree`
+|===
+
+
+== Security and cryptography
+
+=== 29. Keys, certificates, and signatures
+
+[%autowidth, options="header"]
+|===
+| Extensions or filenames | Icon | Nerd Font name
+| Private key `.key` | 󰌆 | `nf-md-key`
+| Public key `.pub` |  | `nf-fa-key`
+| SSH private key `id_rsa`, `id_ed25519`, etc. | 󰌆 | `nf-md-key`
+| `authorized_keys`, `known_hosts` |  | `nf-fa-key`
+| Certificate `.crt`, `.cer`, `.cert` | 󰄤 | `nf-md-certificate_outline`
+| PEM `.pem` | 󰄤 | `nf-md-certificate_outline`
+| PKCS#12 `.p12`, `.pfx` |  | `nf-fa-lock`
+| Certificate request `.csr` | 󰄤 | `nf-md-certificate_outline`
+| GPG key `.gpg`, `.pgp`, `.asc` | 󰌆 | `nf-md-key`
+| Detached signature `.sig`, `.sign` | 󰊕 | `nf-md-fountain_pen_tip`
+| Age-encrypted `.age` |  | `nf-fa-lock`
+| Password database `.kdbx` | 󰌆 | `nf-md-key`
+| TPM blob | 󰒃 | `nf-md-shield_check`
+|===
+
+
+=== 30. Checksums and integrity metadata
+
+[%autowidth, options="header"]
+|===
+| Extensions | Icon | Nerd Font name
+| `.md5`, `.md5sum` |  | `nf-cod-check`
+| `.sha1`, `.sha224`, `.sha256` |  | `nf-cod-check`
+| `.sha384`, `.sha512` |  | `nf-cod-check`
+| `.b2`, `.b3`, `.blake2`, `.blake3` |  | `nf-cod-check`
+| `.sfv` |  | `nf-cod-check`
+| `CHECKSUMS`, `SHA256SUMS` |  | `nf-cod-check`
+|===
+
+
+== Logs, temporary files, and generated artifacts
+
+=== 31. Logs and reports
+
+[%autowidth, options="header"]
+|===
+| Extensions or names | Icon | Nerd Font name
+| `.log`, `*.log.*` | 󰌱 | `nf-md-file_document`
+| `.journal` | 󰌱 | `nf-md-file_document`
+| `.trace`, `.strace`, `.ltrace` | 󰍛 | `nf-md-chart_timeline_variant`
+| `.coverage`, `.lcov`, `.gcov` |  | `nf-cod-debug_coverage`
+| `.prof`, `.profile`, `.sar` |  | `nf-cod-graph`
+| Crash report |  | `nf-cod-error`
+|===
+
+
+=== 32. Temporary, backup, and lock files
+
+[%autowidth, options="header"]
+|===
+| Pattern | Icon | Nerd Font name
+| `*.tmp`, `*.temp` | 󰃰 | `nf-md-file_clock_outline`
+| `*.swp`, `*.swo`, `*.swn` |  | `nf-dev-vim`
+| `*~` | 󰁯 | `nf-md-backup_restore`
+| `*.bak`, `*.backup`, `*.old`, `*.orig` | 󰁯 | `nf-md-backup_restore`
+| `*.lock`, `*.lck`, `.lock` |  | `nf-fa-lock`
+| `*.pid` | 󰀄 | `nf-md-identifier`
+| `*.sock` | 󰖩 | `nf-md-lan_connect`
+| `.#*`, `#*#` | 󰃰 | `nf-md-file_clock_outline`
+| `.DS_Store` |  | `nf-dev-apple`
+| `Thumbs.db`, `desktop.ini` |  | `nf-custom-windows`
+|===
+
+
+== Secondary status columns
+
+=== 33. Filesystem state
+
+[%autowidth, options="header"]
+|===
+| State | Icon | Nerd Font name
+| Symbolic link |  | `nf-fa-link`
+| Broken link | 󰌺 | `nf-md-link_off`
+| Mount point | 󰋊 | `nf-md-harddisk`
+| Hidden |  | `nf-fa-eye_slash`
+| Read-only | 󰌾 | `nf-md-lock_outline`
+| Immutable |  | `nf-fa-lock`
+| Append-only | 󰐕 | `nf-md-lock_plus`
+| Extended attributes |  | `nf-oct-file_code`
+| POSIX ACL | 󰌆 | `nf-md-key`
+| SELinux label | 󰒃 | `nf-md-shield_check`
+| Capability set | 󰌆 | `nf-md-key`
+| Sparse file |  | `nf-cod-circle_slash`
+| Offline or placeholder |  | `nf-cod-cloud`
+| Inaccessible |  | `nf-cod-error`
+|===
+
+
+=== 34. Permission indicators
+
+[%autowidth, options="header"]
+|===
+| State | Icon | Nerd Font name
+| Executable |  | `nf-oct-terminal`
+| Setuid | 󰌆 | `nf-md-key`
+| Setgid | 󰌆 | `nf-md-key`
+| Sticky directory |  | `nf-fa-sticky_note`
+| World-writable |  | `nf-fa-warning`
+| Owned by current user |  | `nf-fa-user`
+| Owned by another user | 󰀀 | `nf-md-account_group`
+| Root-owned | 󰒃 | `nf-md-shield_check`
+| No access |  | `nf-fa-lock`
+|===
+
+
+Do not display all permission indicators simultaneously. A single permission-warning column is normally sufficient.
+
+== Git rules
+
+The Git glyphs draw from more than one Nerd Font class, so one class is fixed
+*per concept* -- every consumer resolves the exact code point listed in the
+tables below, no matter which suite it borrows from:
+
+* *Per-file diff states* (<<_35_per_file_git_state>>) use the Codicon
+  `nf-cod-diff_*` set, with `nf-cod-copy` for a copy, `nf-cod-git_merge` for an
+  unmerged conflict, `nf-cod-file_submodule` for a submodule, and the Font Awesome
+  `nf-fa-question` for untracked (Codicon has no distinct untracked glyph).
+* *Repository-level indicators* (<<_37_repository_level_git_indicators>>) use
+  Octicons `nf-oct-*` where one exists (repository, alternative branch, stash),
+  the Powerline `nf-pl-branch` for the current branch, the Codicon `nf-cod-git_*`
+  set for the concepts Octicons lack a clean glyph for (commit, merge, compare,
+  fetch, pull request), and `nf-fa-tag` for a tag; ahead/behind stay ASCII
+  (`↑`/`↓`).
+
+The chosen code points are the ones in the tables; they are the single source of
+truth for the `wfm` git column and repository chrome and for any other consumer.
+
+=== 35. Per-file Git state
+
+[%autowidth, options="header"]
+|===
+| Git state | Icon | Nerd Font name
+| Untracked |  | `nf-fa-question`
+| Added |  | `nf-cod-diff_added`
+| Modified |  | `nf-cod-diff_modified`
+| Deleted |  | `nf-cod-diff_removed`
+| Renamed |  | `nf-cod-diff_renamed`
+| Copied |  | `nf-cod-copy`
+| Ignored |  | `nf-cod-diff_ignored`
+| Type changed |  | `nf-cod-diff`
+| Unmerged or conflict |  | `nf-cod-git_merge`
+| Clean | none | —
+| Submodule changed |  | `nf-cod-file_submodule`
+| Assume unchanged |  | `nf-cod-diff_ignored`
+| Skip worktree |  | `nf-cod-eye`
+|===
+
+
+=== 36. Staging representation
+
+A two-column model is clearer than inventing separate icons:
+
+[%autowidth, options="header"]
+|===
+| Index column | Worktree column | Meaning
+| `` | blank | Added and staged
+| `` | blank | Modified and staged
+| blank | `` | Modified but unstaged
+| `` | `` | Partially staged
+| `` | blank | Deletion staged
+| blank | `` | Deleted but unstaged
+| `` | `` | Conflict
+|===
+
+
+=== 37. Repository-level Git indicators
+
+[%autowidth, options="header"]
+|===
+| Meaning | Icon | Nerd Font name
+| Repository |  | `nf-oct-repo`
+| Branch |  | `nf-pl-branch`
+| Alternative branch |  | `nf-oct-git_branch`
+| Commit |  | `nf-cod-git_commit`
+| Merge |  | `nf-cod-git_merge`
+| Compare or divergence |  | `nf-cod-git_compare`
+| Fetch |  | `nf-cod-git_fetch`
+| Pull request |  | `nf-cod-git_pull_request`
+| Remote ahead | ↑ | ASCII
+| Remote behind | ↓ | ASCII
+| Stash |  | `nf-oct-package`
+| Tag |  | `nf-fa-tag`
+|===
+
+
+== Backup rules
+
+=== 38. Backup inclusion and freshness
+
+[%autowidth, options="header"]
+|===
+| Backup state | Icon | Nerd Font name
+| Current backup exists | none or 󰄬 | `nf-md-check`
+| Verified backup | 󰒃 | `nf-md-shield_check`
+| Modified since backup | 󰑐 | `nf-md-sync`
+| Never backed up |  | `nf-fa-question`
+| Backup pending | 󰥔 | `nf-md-clock_outline`
+| Backup in progress | 󰑐 | `nf-md-sync`
+| Backup failed | 󰅚 | `nf-md-alert_circle_outline`
+| Excluded by rule |  | `nf-cod-exclude`
+| Parent excluded | 󰈉 | `nf-md-file_hidden`
+| Metadata unavailable | 󰋗 | `nf-md-help_circle_outline`
+| Backup repository offline |  | `nf-cod-cloud`
+| Integrity failure |  | `nf-cod-error`
+|===
+
+
+Recommended compact policy:
+
+[%autowidth, options="header"]
+|===
+| State | Display
+| Backed up and current | blank
+| Needs backup | 󰑐
+| Never backed up | 
+| Excluded intentionally | 
+| Backup error | 󰅚
+| Unknown | 󰋗
+|===
+
+
+An excluded file is not a backup failure and should not use an error icon.
+
+== Diagnostics and operational state
+
+=== 39. File operation state
+
+[%autowidth, options="header"]
+|===
+| State | Icon | Nerd Font name
+| Copying |  | `nf-cod-copy`
+| Moving |  | `nf-cod-arrow_right`
+| Deleting |  | `nf-fa-trash`
+| Scanning |  | `nf-cod-search`
+| Hashing |  | `nf-cod-check`
+| Loading metadata | 󰥔 | `nf-md-clock_outline`
+| Operation complete |  | `nf-cod-check`
+| Warning |  | `nf-fa-warning`
+| Error |  | `nf-cod-error`
+| Information |  | `nf-fa-info_circle`
+| Cancelled |  | `nf-cod-close`
+| Filtered |  | `nf-cod-filter`
+| Selected |  | `nf-cod-circle_large_filled`
+| Marked |  | `nf-cod-check`
+|===
+
+
+== Ambiguous extensions
+
+=== 40. Extensions requiring context or content inspection
+
+[%autowidth, options="header"]
+|===
+| Extension | Possible meanings | Resolution
+| `.ts` | TypeScript, MPEG transport stream | Check MIME and file header
+| `.m` | Objective-C, MATLAB/Octave, Mathematica | Inspect content or project
+| `.h` | C, C++, Objective-C header | Infer from project
+| `.v` | Verilog, V language, Coq | Inspect syntax and project
+| `.inc` | C include, assembly include, BitBake include | Infer from directory and content
+| `.bin` | Firmware, executable, disk image, arbitrary binary | Inspect magic and size
+| `.img` | Disk image, firmware, raster image | Inspect magic
+| `.raw` | Disk image, camera image, raw samples | Inspect magic and context
+| `.key` | Private key, Apple presentation | Inspect header
+| `.asc` | ASCII-armored key, signature, LTspice schematic | Inspect content
+| `.cue` | Audio cue sheet, CUE configuration | Inspect content
+| `.db` | SQLite, Berkeley DB, arbitrary application data | Inspect magic
+| `.dat` | Arbitrary data | Inspect content
+| `.map` | Linker map, geographic map, source map | Inspect content
+| `.mod` | Kernel module, Fortran module, tracker music | Inspect magic and context
+| `.lib` | Static library, EDA library, application data | Inspect magic
+| `.apk` | Android application, Alpine package | Inspect ZIP members or package header
+|===
+
+
+== Content-detection fallbacks
+
+=== 41. Magic and content rules
+
+[%autowidth, options="header"]
+|===
+| Detection | Icon | Nerd Font name
+| UTF-8 or other readable text |  | `nf-fa-file_text_o`
+| Source-like text |  | `nf-cod-file_code`
+| ELF executable |  | `nf-oct-terminal`
+| ELF shared object |  | `nf-cod-library`
+| ELF relocatable object |  | `nf-cod-file_binary`
+| Script with shebang |  | `nf-dev-terminal`
+| Archive recognized by magic |  | `nf-cod-file_zip`
+| Raster image |  | `nf-cod-file_media`
+| Audio |  | `nf-fa-file_audio_o`
+| Video |  | `nf-fa-file_video_o`
+| PDF |  | `nf-cod-file_pdf`
+| SQLite database |  | `nf-cod-database`
+| Filesystem or partition image |  | `nf-fa-hdd_o`
+| Unknown binary |  | `nf-cod-file_binary`
+| Empty file |  | `nf-cod-file`
+|===
+
+
+A content scan should be bounded. Reading the first 4 to 64 KiB is normally enough for magic detection and basic text classification.
+
+== Recommended TUI layout
+
+=== 42. Full layout
+
+----
+S  T  Gᵢ G𝓌 B  P   Size     Modified             Name
+●       󰑐      18.4 KiB  2026-07-14 00:12     scanner.rs
+              󰌾  4.0 KiB   2026-07-13 22:41     firmware/
+                 12 B      2026-07-12 19:08     latest -> release
+              2.0 MiB   2026-07-14 00:03     image.bin
+----
+
+[%autowidth, options="header"]
+|===
+| Column | Meaning
+| `S` | Selection or mark
+| `T` | Primary type icon
+| `Gᵢ` | Git index state
+| `G𝓌` | Git worktree state
+| `B` | Backup state
+| `P` | Permission or warning state
+| Remaining columns | File metadata and name
+|===
+
+
+=== 43. Compact layout
+
+----
+T  G  B  Name
+  󰑐 scanner.rs
+       firmware
+       target
+       latest
+----
+
+Use one Git column only when staged versus unstaged state is not important.
+
+=== 44. Minimal layout
+
+----
+ scanner.rs   M !
+ firmware/
+ latest -> release
+----
+
+Here the left icon represents type while short ASCII suffixes represent state. This works better on terminals where wide private-use glyphs align poorly.
+
+== Implementation policy
+
+=== 45. Matching algorithm
+
+[%autowidth, options="header"]
+|===
+| Step | Action
+| 1 | Read `lstat()` metadata without following links
+| 2 | Classify special filesystem objects
+| 3 | Resolve valid symlink target type when configured
+| 4 | Match exact basename rules case-sensitively
+| 5 | Match case-insensitive filename rules where appropriate
+| 6 | Match longest compound extension
+| 7 | Match simple extension
+| 8 | Inspect magic bytes for ambiguous or unknown types
+| 9 | Detect text and shebang
+| 10 | Apply generic fallback
+| 11 | Calculate independent Git state
+| 12 | Calculate independent backup state
+| 13 | Add permission and diagnostic indicators
+|===
+
+
+=== 46. Extension normalization
+
+[%autowidth, options="header"]
+|===
+| Rule | Example
+| Prefer longest suffix | `file.tar.zst` before `.zst`
+| Preserve case when meaningful | `Makefile`, `Image`, `Kconfig`
+| Otherwise compare extensions case-insensitively | `.JPG` equals `.jpg`
+| Treat leading-dot names as filenames first | `.gitignore` is not extension `gitignore`
+| Support numeric shared-library suffixes | `libfoo.so.3.2`
+| Support generated compression suffixes | `.dtb.gz`, `.ko.zst`
+| Permit project-local overrides | `.bin` as firmware in embedded project
+|===
+
+
+=== 47. Icon-width handling
+
+[%autowidth, options="header"]
+|===
+| Requirement | Recommendation
+| Cell width | Measure rendered width rather than assuming one cell
+| Padding | Reserve two terminal columns for the icon field
+| Variation selectors | Avoid unless explicitly supported
+| Combining characters | Do not use for status overlays
+| Missing glyph | Fall back to ASCII or generic icon
+| Font requirement | Require a Nerd Font 3.x-compatible font
+| Configuration | Allow all glyphs to be overridden
+| Testing | Test with Kitty, foot, Alacritty, and other common terminals
+|===
+
+
+=== 48. ASCII fallback set
+
+[%autowidth, options="header"]
+|===
+| Meaning | Fallback
+| Directory | `/`
+| Symlink | `@`
+| Executable | `*`
+| Socket | `=`
+| FIFO | `\|`
+| Block device | `#`
+| Character device | `%`
+| Git modified | `M`
+| Git added | `A`
+| Git deleted | `D`
+| Git renamed | `R`
+| Git conflict | `U`
+| Git untracked | `?`
+| Backup required | `B`
+| Backup excluded | `X`
+| Warning | `!`
+| Error | `E`
+|===
+
+
+=== 49. Recommended default behavior
+
+[%autowidth, options="header"]
+|===
+| Category | Default behavior
+| Type | Always display
+| Clean Git state | Blank
+| Current backup state | Blank
+| Normal permissions | Blank
+| Valid symlink | Type icon plus link indicator if space permits
+| Hidden file | Do not alter type icon
+| Selected file | Use a separate selection marker
+| Errors | Always display
+| Ignored or excluded files | Display only when relevant mode is enabled
+| Colour | Supplement icons, never replace their meaning
+|===
+
+
+The rule data should be externally configurable rather than compiled directly into UI logic. A good configuration model separates exact-filename rules, extension rules, content-detection rules, and independent status overlays.
+
+
+== Waybar and status application icon recommendations
+
+This section defines a compact, consistent icon vocabulary for Waybar, eww, i3status-rust, polybar, tmux status lines, notification daemons, and similar desktop status applications.
+
+The main design rule is to use one semantic family per module and reserve warning icons for exceptional states. Normal states should remain visually quiet.
+
+=== 50. General status-bar principles
+
+[%autowidth, options="header"]
+|===
+| Principle | Recommendation
+| Normal state | Use a neutral icon with no warning decoration
+| Warning state | Use a warning or alert variant only when action is needed
+| Critical state | Use a strong alert, error, or disconnected icon
+| Numeric value | Place the value after the icon
+| Disabled state | Prefer a slashed or off variant
+| Unknown state | Use a question or help-circle icon
+| Module width | Keep icons to one terminal cell where possible
+| Animation | Avoid changing icons rapidly unless showing progress
+| Colour | Use colour as reinforcement, not the sole indicator
+| Consistency | Do not use the same icon for unrelated modules
+|===
+
+
+A typical status item should use this form:
+
+----
+<icon> <value>
+----
+
+Examples:
+
+----
+󰍛 12%
+󰖩 1 Gbit/s
+󰕾 48%
+󰂄 83%
+----
+
+=== 51. Workspaces and window manager state
+
+[%autowidth, options="header"]
+|===
+| State | Icon | Nerd Font name | Notes
+| Workspace |  | `nf-fa-circle` | Generic occupied workspace
+| Empty workspace |  | `nf-fa-circle_o` | Optional empty indicator
+| Active workspace | 󰮯 | `nf-md-circle_slice_8` | Strong active marker
+| Urgent workspace |  | `nf-fa-exclamation_circle` | Attention required
+| Special workspace | 󱂬 | `nf-md-dock_window` | Scratchpad or special workspace
+| Tiled layout | 󰕰 | `nf-md-view_grid_outline` | Tiling mode
+| Floating layout | 󰉈 | `nf-md-window_restore` | Floating mode
+| Fullscreen | 󰊓 | `nf-md-fullscreen` | Fullscreen window
+| Grouped or tabbed | 󰓩 | `nf-md-tab` | Tabbed/group layout
+| Split horizontal | 󰯌 | `nf-md-view_split_horizontal` | Layout indicator
+| Split vertical | 󰯋 | `nf-md-view_split_vertical` | Layout indicator
+| Window count | 󰖲 | `nf-md-application_outline` | Followed by count
+| Locked workspace | 󰌾 | `nf-md-lock_outline` | Restricted or pinned
+|===
+
+
+For numbered workspaces, the number itself is usually clearer than a unique icon:
+
+----
+1  2  3  4
+----
+
+Icons are most useful for special, urgent, or scratchpad workspaces.
+
+=== 52. Window and application state
+
+[%autowidth, options="header"]
+|===
+| State | Icon | Nerd Font name
+| Active application | 󰖲 | `nf-md-application_outline`
+| Terminal |  | `nf-oct-terminal`
+| Browser | 󰖟 | `nf-md-web`
+| Editor |  | `nf-cod-file_code`
+| File manager | 󰉋 | `nf-md-folder_outline`
+| Media player | 󰐊 | `nf-md-play`
+| Chat | 󰭹 | `nf-md-message_text_outline`
+| Mail | 󰇮 | `nf-md-email_outline`
+| Settings |  | `nf-cod-gear`
+| Hidden window |  | `nf-fa-eye_slash`
+| Always on top | 󰐃 | `nf-md-pin_outline`
+| Minimized | 󰖰 | `nf-md-window_minimize`
+| Maximized | 󰖯 | `nf-md-window_maximize`
+| Close |  | `nf-cod-close`
+|===
+
+
+Application-specific icons should be optional. A generic application icon is more robust when window classes are inconsistent.
+
+=== 53. Clock, date, and calendar
+
+[%autowidth, options="header"]
+|===
+| State | Icon | Nerd Font name
+| Clock | 󰥔 | `nf-md-clock_outline`
+| Date |  | `nf-fa-calendar`
+| Calendar | 󰃭 | `nf-md-calendar_month_outline`
+| Alarm active | 󰀠 | `nf-md-alarm`
+| Alarm off | 󰀣 | `nf-md-alarm_off`
+| Timer | 󰔛 | `nf-md-timer_outline`
+| Stopwatch | 󰔟 | `nf-md-timer_sand`
+| World clock | 󰗊 | `nf-md-web_clock`
+| Event pending | 󰃰 | `nf-md-file_clock_outline`
+| Meeting | 󰍑 | `nf-md-calendar_account`
+|===
+
+
+Recommended compact format:
+
+----
+󰥔 14:32
+ 2026-07-14
+----
+
+=== 54. CPU and system load
+
+[%autowidth, options="header"]
+|===
+| State | Icon | Nerd Font name
+| CPU |  | `nf-fa-microchip`
+| CPU alternative | 󰘚 | `nf-md-memory`
+| Low load |  | `nf-fa-microchip`
+| High load |  | `nf-fa-warning`
+| Critical load |  | `nf-cod-error`
+| CPU temperature |  | `nf-fa-thermometer_half`
+| Thermal warning | 󰔄 | `nf-md-thermometer_alert`
+| Fan | 󰈐 | `nf-md-fan`
+| Fan off | 󰈑 | `nf-md-fan_off`
+| Process count | 󰘚 | `nf-md-file_tree`
+| Scheduler pressure | 󰓅 | `nf-md-chart_timeline_variant`
+|===
+
+
+Recommended display:
+
+----
+ 18%
+ 54°C
+----
+
+=== 55. Memory, swap, and storage
+
+[%autowidth, options="header"]
+|===
+| State | Icon | Nerd Font name
+| Memory | 󰘚 | `nf-md-memory`
+| Swap | 󰾴 | `nf-md-swap_horizontal`
+| Disk usage | 󰋊 | `nf-md-harddisk`
+| SSD or NVMe | 󰋊 | `nf-md-harddisk`
+| External disk |  | `nf-fa-hdd_o`
+| Mounted filesystem | 󰋊 | `nf-md-harddisk`
+| Unmounted filesystem | 󰋐 | `nf-md-harddisk_remove`
+| Storage warning | 󰋔 | `nf-md-harddisk_alert`
+| Storage failure |  | `nf-cod-error`
+| Read activity | 󰁅 | `nf-md-download`
+| Write activity | 󰁝 | `nf-md-upload`
+| Filesystem read-only | 󰌾 | `nf-md-lock_outline`
+|===
+
+
+Recommended display:
+
+----
+󰘚 42%
+󰋊 71%
+----
+
+=== 56. Battery and power
+
+[%autowidth, options="header"]
+|===
+| Charge state | Icon | Nerd Font name
+| Battery full | 󰁹 | `nf-md-battery`
+| Battery 90% | 󰂂 | `nf-md-battery_90`
+| Battery 80% | 󰂁 | `nf-md-battery_80`
+| Battery 70% | 󰂀 | `nf-md-battery_70`
+| Battery 60% | 󰁿 | `nf-md-battery_60`
+| Battery 50% | 󰁾 | `nf-md-battery_50`
+| Battery 40% | 󰁽 | `nf-md-battery_40`
+| Battery 30% | 󰁼 | `nf-md-battery_30`
+| Battery 20% | 󰁻 | `nf-md-battery_20`
+| Battery 10% | 󰁺 | `nf-md-battery_10`
+| Battery unknown | 󰂑 | `nf-md-battery_unknown`
+| Charging | 󰂄 | `nf-md-battery_charging`
+| Charging full | 󰂅 | `nf-md-battery_charging_100`
+| Battery alert | 󰂃 | `nf-md-battery_alert`
+| Battery off | 󰂎 | `nf-md-battery_off_outline`
+| AC power | 󰚥 | `nf-md-power_plug`
+| AC disconnected | 󰚦 | `nf-md-power_plug_off`
+| Power profile | 󰾅 | `nf-md-speedometer`
+| Performance mode | 󰓅 | `nf-md-gauge_full`
+| Balanced mode | 󰾅 | `nf-md-speedometer`
+| Power-saving mode | 󰌪 | `nf-md-leaf`
+|===
+
+
+For most bars, three or four battery levels are enough:
+
+[%autowidth, options="header"]
+|===
+| Range | Icon
+| 75–100% | 󰁹
+| 40–74% | 󰁾
+| 15–39% | 󰁼
+| 0–14% | 󰂃
+| Charging | 󰂄
+|===
+
+
+=== 57. Audio output
+
+[%autowidth, options="header"]
+|===
+| State | Icon | Nerd Font name
+| Volume high | 󰕾 | `nf-md-volume_high`
+| Volume medium | 󰖀 | `nf-md-volume_medium`
+| Volume low | 󰕿 | `nf-md-volume_low`
+| Muted | 󰝟 | `nf-md-volume_mute`
+| Volume off | 󰖁 | `nf-md-volume_off`
+| Headphones |  | `nf-fa-headphones`
+| Headset | 󰋎 | `nf-md-headset`
+| Speakers | 󰓃 | `nf-md-speaker`
+| HDMI audio | 󰡁 | `nf-md-monitor_speaker`
+| Bluetooth audio | 󰂯 | `nf-md-bluetooth_audio`
+| Audio device missing | 󰓄 | `nf-md-speaker_off`
+| Audio error | 󰓄 | `nf-md-speaker_off`
+|===
+
+
+Recommended volume thresholds:
+
+[%autowidth, options="header"]
+|===
+| Range | Icon
+| 67–100% | 󰕾
+| 34–66% | 󰖀
+| 1–33% | 󰕿
+| Muted or 0% | 󰝟
+|===
+
+
+=== 58. Microphone and recording
+
+[%autowidth, options="header"]
+|===
+| State | Icon | Nerd Font name
+| Microphone active | 󰍬 | `nf-md-microphone`
+| Microphone muted | 󰍭 | `nf-md-microphone_off`
+| Recording |  | `nf-fa-circle`
+| Recording paused | 󰏤 | `nf-md-pause`
+| Recording unavailable | 󰍭 | `nf-md-microphone_off`
+| Push-to-talk active | 󰍬 | `nf-md-microphone`
+| Privacy warning | 󰒃 | `nf-md-shield_check`
+|===
+
+
+A microphone icon should normally be hidden while inactive, then shown when a process is recording.
+
+=== 59. Network status
+
+[%autowidth, options="header"]
+|===
+| State | Icon | Nerd Font name
+| Ethernet connected | 󰈀 | `nf-md-ethernet`
+| Ethernet disconnected | 󰈂 | `nf-md-ethernet_off`
+| Network generic | 󰖩 | `nf-md-lan_connect`
+| Network disconnected | 󰖪 | `nf-md-lan_disconnect`
+| Internet available | 󰖟 | `nf-md-web`
+| No internet | 󰖪 | `nf-md-lan_disconnect`
+| Upload | 󰁝 | `nf-md-upload`
+| Download | 󰁅 | `nf-md-download`
+| Network traffic | 󰓅 | `nf-md-chart_timeline_variant`
+| VPN connected | 󰒃 | `nf-md-shield_check`
+| VPN disconnected | 󰒄 | `nf-md-shield_off_outline`
+| Hotspot | 󰖩 | `nf-md-lan_connect`
+| Metered network | 󰍛 | `nf-md-chart_timeline_variant`
+| Captive portal |  | `nf-fa-exclamation_circle`
+|===
+
+
+Recommended compact Ethernet display:
+
+----
+󰈀 1G
+󰁅 4.2M 󰁝 830K
+----
+
+=== 60. Wi-Fi
+
+[%autowidth, options="header"]
+|===
+| Signal state | Icon | Nerd Font name
+| Strong | 󰤨 | `nf-md-wifi`
+| Medium | 󰤥 | `nf-md-wifi_strength_3`
+| Weak | 󰤟 | `nf-md-wifi_strength_1`
+| Very weak | 󰤯 | `nf-md-wifi_strength_outline`
+| Disconnected | 󰤭 | `nf-md-wifi_off`
+| No internet | 󰤫 | `nf-md-wifi_alert`
+| Secured | 󰤪 | `nf-md-wifi_lock`
+| Hotspot active | 󰖩 | `nf-md-lan_connect`
+| Searching | 󰤩 | `nf-md-wifi_sync`
+|===
+
+
+A practical threshold mapping:
+
+[%autowidth, options="header"]
+|===
+| Signal | Icon
+| ≥ 75% | 󰤨
+| 50–74% | 󰤥
+| 25–49% | 󰤢
+| 1–24% | 󰤟
+| Disconnected | 󰤭
+|===
+
+
+=== 61. Bluetooth
+
+[%autowidth, options="header"]
+|===
+| State | Icon | Nerd Font name
+| Bluetooth enabled | 󰂯 | `nf-md-bluetooth`
+| Bluetooth connected | 󰂱 | `nf-md-bluetooth_connect`
+| Bluetooth disabled | 󰂲 | `nf-md-bluetooth_off`
+| Bluetooth searching | 󰂰 | `nf-md-bluetooth_transfer`
+| Bluetooth audio | 󰂯 | `nf-md-bluetooth_audio`
+| Bluetooth error |  | `nf-fa-exclamation_circle`
+| Keyboard connected | 󰌌 | `nf-md-keyboard`
+| Mouse connected | 󰍽 | `nf-md-mouse`
+| Gamepad connected | 󰊴 | `nf-md-gamepad_variant`
+|===
+
+
+Hide the module while Bluetooth is disabled unless disabled state is operationally important.
+
+=== 62. Display and brightness
+
+[%autowidth, options="header"]
+|===
+| State | Icon | Nerd Font name
+| Brightness high | 󰃠 | `nf-md-brightness_7`
+| Brightness medium | 󰃝 | `nf-md-brightness_5`
+| Brightness low | 󰃚 | `nf-md-brightness_3`
+| Brightness minimum | 󰃞 | `nf-md-brightness_1`
+| Automatic brightness | 󰃡 | `nf-md-brightness_auto`
+| Night light | 󰖔 | `nf-md-weather_night`
+| Display active | 󰍹 | `nf-md-monitor`
+| Display off | 󰶐 | `nf-md-monitor_off`
+| External display | 󰍺 | `nf-md-monitor_multiple`
+| Screen sharing | 󰍹 | `nf-md-monitor_share`
+| Screen recording |  | `nf-fa-circle`
+|===
+
+
+Recommended thresholds:
+
+[%autowidth, options="header"]
+|===
+| Brightness | Icon
+| 76–100% | 󰃠
+| 51–75% | 󰃝
+| 26–50% | 󰃛
+| 1–25% | 󰃞
+|===
+
+
+=== 63. Keyboard and input state
+
+[%autowidth, options="header"]
+|===
+| State | Icon | Nerd Font name
+| Keyboard layout | 󰌌 | `nf-md-keyboard`
+| Caps Lock | 󰪛 | `nf-md-keyboard_caps`
+| Num Lock | 󰎠 | `nf-md-numeric`
+| Scroll Lock | 󰌒 | `nf-md-keyboard_outline`
+| Input method | 󰗊 | `nf-md-translate`
+| Compose mode | 󰘨 | `nf-md-code_braces`
+| Touchpad enabled | 󰟸 | `nf-md-gesture_tap`
+| Touchpad disabled | 󰤳 | `nf-md-gesture_tap_button`
+| Mouse | 󰍽 | `nf-md-mouse`
+| Tablet | 󰓶 | `nf-md-tablet`
+| Gamepad | 󰊴 | `nf-md-gamepad_variant`
+|===
+
+
+For keyboard layout, show the locale code after the icon:
+
+----
+󰌌 SE
+󰌌 US
+----
+
+=== 64. Notifications and do-not-disturb
+
+[%autowidth, options="header"]
+|===
+| State | Icon | Nerd Font name
+| Notifications enabled | 󰂚 | `nf-md-bell_outline`
+| Notifications pending | 󰂞 | `nf-md-bell_badge_outline`
+| Notification active | 󰂚 | `nf-md-bell_outline`
+| Do not disturb | 󰂛 | `nf-md-bell_off_outline`
+| Urgent notification | 󰂞 | `nf-md-bell_badge_outline`
+| No notifications | 󰂚 | `nf-md-bell_outline`
+| Notification error |  | `nf-fa-exclamation_circle`
+| Mail notification | 󰇮 | `nf-md-email_outline`
+| Chat notification | 󰭹 | `nf-md-message_text_outline`
+|===
+
+
+Recommended behavior:
+
+[%autowidth, options="header"]
+|===
+| Condition | Display
+| No notifications | blank or 󰂚
+| Pending notifications | 󰂞 with count
+| Do not disturb | 󰂛
+| Urgent notification | 
+|===
+
+
+=== 65. Media player
+
+[%autowidth, options="header"]
+|===
+| State | Icon | Nerd Font name
+| Playing | 󰐊 | `nf-md-play`
+| Paused | 󰏤 | `nf-md-pause`
+| Stopped | 󰓛 | `nf-md-stop`
+| Previous | 󰒮 | `nf-md-skip_previous`
+| Next | 󰒭 | `nf-md-skip_next`
+| Music |  | `nf-fa-music`
+| Video |  | `nf-fa-film`
+| Radio | 󰐹 | `nf-md-radio`
+| Repeat | 󰑖 | `nf-md-repeat`
+| Repeat one | 󰑘 | `nf-md-repeat_once`
+| Shuffle | 󰒟 | `nf-md-shuffle_variant`
+| Queue | 󰲸 | `nf-md-playlist_music`
+| No player | 󰝛 | `nf-md-play_circle_outline`
+|===
+
+
+Recommended compact display:
+
+----
+󰐊 Artist — Title
+󰏤 Artist — Title
+----
+
+=== 66. Mail, chat, and messages
+
+[%autowidth, options="header"]
+|===
+| State | Icon | Nerd Font name
+| Mail | 󰇮 | `nf-md-email_outline`
+| Unread mail | 󰇰 | `nf-md-email_alert_outline`
+| Chat | 󰭹 | `nf-md-message_text_outline`
+| Unread messages | 󰭺 | `nf-md-message_badge_outline`
+| Mention | 󰀄 | `nf-md-at`
+| Direct message | 󰭹 | `nf-md-message_text_outline`
+| Offline | 󰖪 | `nf-md-lan_disconnect`
+| Online | 󰄬 | `nf-md-check`
+| Busy | 󰂭 | `nf-md-circle_off_outline`
+|===
+
+
+Only show counts when non-zero.
+
+=== 67. Weather
+
+[%autowidth, options="header"]
+|===
+| Condition | Icon | Nerd Font name
+| Clear day | 󰖙 | `nf-md-weather_sunny`
+| Clear night | 󰖔 | `nf-md-weather_night`
+| Partly cloudy | 󰖕 | `nf-md-weather_partly_cloudy`
+| Cloudy | 󰖐 | `nf-md-weather_cloudy`
+| Fog | 󰖑 | `nf-md-weather_fog`
+| Rain | 󰖗 | `nf-md-weather_rainy`
+| Pouring rain | 󰖖 | `nf-md-weather_pouring`
+| Snow | 󰖘 | `nf-md-weather_snowy`
+| Thunderstorm | 󰖓 | `nf-md-weather_lightning`
+| Wind | 󰖝 | `nf-md-weather_windy`
+| Temperature |  | `nf-fa-thermometer_half`
+| Weather unavailable | 󰖑 | `nf-md-weather_cloudy_alert`
+|===
+
+
+=== 68. Location and privacy indicators
+
+[%autowidth, options="header"]
+|===
+| State | Icon | Nerd Font name
+| Location active | 󰍎 | `nf-md-map_marker`
+| Location disabled | 󰍐 | `nf-md-map_marker_off`
+| Camera active |  | `nf-fa-camera`
+| Camera disabled | 󰄀 | `nf-md-camera_off`
+| Microphone active | 󰍬 | `nf-md-microphone`
+| Screen capture active | 󰍹 | `nf-md-monitor_share`
+| Clipboard accessed | 󰅍 | `nf-md-clipboard_outline`
+| Privacy warning | 󰒃 | `nf-md-shield_check`
+| Insecure state | 󰒄 | `nf-md-shield_off_outline`
+|===
+
+
+Privacy indicators should appear only while the corresponding resource is in use.
+
+=== 69. Security and session state
+
+[%autowidth, options="header"]
+|===
+| State | Icon | Nerd Font name
+| Screen locked |  | `nf-fa-lock`
+| Screen unlocked |  | `nf-fa-unlock`
+| Secure session | 󰒃 | `nf-md-shield_check`
+| Security warning | 󰒄 | `nf-md-shield_off_outline`
+| VPN active | 󰒃 | `nf-md-shield_check`
+| Firewall active | 󰒃 | `nf-md-shield_check`
+| Firewall disabled | 󰒄 | `nf-md-shield_off_outline`
+| Authentication required | 󰌆 | `nf-md-key`
+| Root or elevated session | 󰒃 | `nf-md-shield_check`
+| SSH session | 󰣀 | `nf-md-console_network_outline`
+| Remote desktop | 󰍹 | `nf-md-monitor`
+|===
+
+
+Do not use a shield icon for every security-related module. Distinguish VPN, firewall, and lock state through tooltip text or labels.
+
+=== 70. Package updates
+
+[%autowidth, options="header"]
+|===
+| State | Icon | Nerd Font name
+| Updates available | 󰏗 | `nf-md-package_variant`
+| System current | 󰄬 | `nf-md-check`
+| Update in progress | 󰑐 | `nf-md-sync`
+| Reboot required | 󰜉 | `nf-md-restart`
+| Update failed | 󰅚 | `nf-md-alert_circle_outline`
+| Package manager locked |  | `nf-fa-lock`
+| Repository unavailable | 󰖪 | `nf-md-lan_disconnect`
+| Security updates | 󰒃 | `nf-md-shield_check`
+|===
+
+
+Recommended compact format:
+
+----
+󰏗 12
+󰜉
+----
+
+=== 71. Containers and virtual machines
+
+[%autowidth, options="header"]
+|===
+| State | Icon | Nerd Font name
+| Containers running |  | `nf-oct-container`
+| Container stopped | 󰓛 | `nf-md-stop`
+| Container error |  | `nf-cod-error`
+| Docker |  | `nf-dev-docker`
+| Podman |  | `nf-oct-container`
+| Virtual machine | 󰍹 | `nf-md-monitor`
+| VM running | 󰐊 | `nf-md-play`
+| VM paused | 󰏤 | `nf-md-pause`
+| VM stopped | 󰓛 | `nf-md-stop`
+| Hypervisor | 󰘚 | `nf-md-memory`
+| Namespace or sandbox | 󰒃 | `nf-md-shield_check`
+|===
+
+
+A count is usually more useful than per-container icons:
+
+----
+ 4
+----
+
+=== 72. Development and build status
+
+[%autowidth, options="header"]
+|===
+| State | Icon | Nerd Font name
+| Build successful |  | `nf-cod-check`
+| Build running | 󰑐 | `nf-md-sync`
+| Build failed |  | `nf-cod-error`
+| Tests passing |  | `nf-cod-beaker`
+| Tests failed |  | `nf-fa-warning`
+| Git branch |  | `nf-pl-branch`
+| Git dirty |  | `nf-cod-diff_modified`
+| Git ahead | ↑ | ASCII
+| Git behind | ↓ | ASCII
+| CI successful |  | `nf-cod-check`
+| CI failed |  | `nf-cod-error`
+| Debugger attached |  | `nf-cod-debug`
+| Compiler active | 󰔷 | `nf-md-hammer_wrench`
+|===
+
+
+These are more suitable for project-specific bars or tmux status lines than a global desktop bar.
+
+=== 73. System services and daemons
+
+[%autowidth, options="header"]
+|===
+| State | Icon | Nerd Font name
+| Service running | 󰐊 | `nf-md-play`
+| Service stopped | 󰓛 | `nf-md-stop`
+| Service failed |  | `nf-cod-error`
+| Service restarting | 󰜉 | `nf-md-restart`
+| Service degraded |  | `nf-fa-warning`
+| Daemon |  | `nf-cod-gear`
+| Database service |  | `nf-cod-database`
+| Web service | 󰖟 | `nf-md-web`
+| File service | 󰉋 | `nf-md-folder_outline`
+| Time synchronization | 󰥔 | `nf-md-clock_outline`
+| Backup daemon | 󰁯 | `nf-md-backup_restore`
+|===
+
+
+=== 74. Backup and synchronization
+
+[%autowidth, options="header"]
+|===
+| State | Icon | Nerd Font name
+| Backup current | 󰄬 | `nf-md-check`
+| Backup required | 󰑐 | `nf-md-sync`
+| Backup running | 󰑐 | `nf-md-sync`
+| Backup failed | 󰅚 | `nf-md-alert_circle_outline`
+| Backup repository unavailable |  | `nf-cod-cloud`
+| Sync current | 󰄬 | `nf-md-check`
+| Syncing | 󰑐 | `nf-md-sync`
+| Sync conflict |  | `nf-cod-git_merge`
+| Cloud available |  | `nf-cod-cloud`
+| Cloud offline | 󰅟 | `nf-md-cloud_off_outline`
+|===
+
+
+=== 75. Temperature and hardware sensors
+
+[%autowidth, options="header"]
+|===
+| Sensor | Icon | Nerd Font name
+| Temperature |  | `nf-fa-thermometer_half`
+| Temperature low |  | `nf-fa-thermometer_empty`
+| Temperature high |  | `nf-fa-thermometer_full`
+| Thermal alert | 󰔄 | `nf-md-thermometer_alert`
+| Fan | 󰈐 | `nf-md-fan`
+| Voltage | 󰚥 | `nf-md-power_plug`
+| Current | 󰚥 | `nf-md-power_plug`
+| Power draw |  | `nf-fa-bolt`
+| GPU | 󰢮 | `nf-md-expansion_card`
+| CPU |  | `nf-fa-microchip`
+| Memory | 󰘚 | `nf-md-memory`
+| Disk | 󰋊 | `nf-md-harddisk`
+|===
+
+
+=== 76. GPU status
+
+[%autowidth, options="header"]
+|===
+| State | Icon | Nerd Font name
+| GPU | 󰢮 | `nf-md-expansion_card`
+| GPU load | 󰓅 | `nf-md-chart_timeline_variant`
+| GPU temperature |  | `nf-fa-thermometer_half`
+| VRAM | 󰘚 | `nf-md-memory`
+| Discrete GPU active | 󰢮 | `nf-md-expansion_card`
+| Integrated GPU active |  | `nf-fa-microchip`
+| GPU suspended | 󰒲 | `nf-md-power_sleep`
+| GPU error |  | `nf-cod-error`
+|===
+
+
+=== 77. Power and session controls
+
+[%autowidth, options="header"]
+|===
+| Action | Icon | Nerd Font name
+| Lock |  | `nf-fa-lock`
+| Logout | 󰍃 | `nf-md-logout`
+| Suspend | 󰒲 | `nf-md-power_sleep`
+| Hibernate | 󰒲 | `nf-md-power_sleep`
+| Restart | 󰜉 | `nf-md-restart`
+| Shutdown |  | `nf-fa-power_off`
+| Reboot to firmware | 󰌢 | `nf-md-monitor`
+| Session menu |  | `nf-fa-power_off`
+|===
+
+
+=== 78. Common alert vocabulary
+
+Use the same alert vocabulary throughout the bar:
+
+[%autowidth, options="header"]
+|===
+| Severity | Icon | Nerd Font name
+| Information |  | `nf-fa-info_circle`
+| Success | 󰄬 | `nf-md-check`
+| Pending | 󰥔 | `nf-md-clock_outline`
+| Synchronizing | 󰑐 | `nf-md-sync`
+| Warning |  | `nf-fa-warning`
+| Error |  | `nf-cod-error`
+| Critical | 󰅚 | `nf-md-alert_circle_outline`
+| Unknown | 󰋗 | `nf-md-help_circle_outline`
+| Disabled | 󰅖 | `nf-md-close`
+| Disconnected | 󰖪 | `nf-md-lan_disconnect`
+|===
+
+
+=== 79. Recommended default Waybar module set
+
+[%autowidth, options="header"]
+|===
+| Module | Normal icon | Warning icon | Critical or disabled icon
+| Workspaces | number or `` | `` | —
+| Clock | `󰥔` | — | —
+| CPU | `` | `` | ``
+| Memory | `󰘚` | `` | ``
+| Temperature | `` | `󰔄` | ``
+| Disk | `󰋊` | `󰋔` | ``
+| Network | `󰈀` or `󰤨` | `󰤫` | `󰖪`
+| VPN | `󰒃` | — | `󰒄`
+| Bluetooth | `󰂱` | — | `󰂲`
+| Audio | `󰕾` | — | `󰝟`
+| Microphone | hidden | `󰍬` | `󰍭`
+| Brightness | `󰃠` | — | —
+| Battery | `󰁹` | `󰁼` | `󰂃`
+| Notifications | hidden or `󰂚` | `󰂞` | `󰂛`
+| Updates | hidden | `󰏗` | `󰅚`
+| Media | `󰐊` | `󰏤` | hidden
+| Power menu | `` | — | —
+|===
+
+
+=== 80. Example Waybar layout
+
+----
+1 2 3 4  |   main  |  󰐊 Artist — Title
+                                   󰤨 office  󰂱  󰕾 42%   54°C  󰂄 83%  󰥔 14:32
+----
+
+A more compact layout:
+
+----
+1 2 3 4    󰤨  󰕾 42   54°  󰂄 83  󰥔 14:32
+----
+
+A diagnostic-oriented layout:
+
+----
+ 18%  󰘚 42%  󰋊 71%  󰁅 4.2M  󰁝 830K  󰤨 -51dBm  󰂄 83%
+----
+
+=== 81. Example Waybar JSON fragments
+
+==== Audio
+
+[source,json]
+----
+{
+  "format": "{icon} {volume}%",
+  "format-muted": "󰝟",
+  "format-icons": {
+    "headphone": "",
+    "hands-free": "󰋎",
+    "headset": "󰋎",
+    "phone": "",
+    "portable": "",
+    "car": "",
+    "default": ["󰕿", "󰖀", "󰕾"]
+  }
+}
+----
+
+==== Battery
+
+[source,json]
+----
+{
+  "format": "{icon} {capacity}%",
+  "format-charging": "󰂄 {capacity}%",
+  "format-plugged": "󰚥 {capacity}%",
+  "format-alt": "{time} {icon}",
+  "format-icons": ["󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"]
+}
+----
+
+==== Network
+
+[source,json]
+----
+{
+  "format-wifi": "󰤨 {signalStrength}%",
+  "format-ethernet": "󰈀 {ipaddr}",
+  "format-linked": "󰈀 {ifname}",
+  "format-disconnected": "󰖪",
+  "format-alt": "{ifname}: {ipaddr}"
+}
+----
+
+==== CPU and memory
+
+[source,json]
+----
+{
+  "cpu": {
+    "format": " {usage}%"
+  },
+  "memory": {
+    "format": "󰘚 {percentage}%"
+  }
+}
+----
+
+==== Clock
+
+[source,json]
+----
+{
+  "format": "󰥔 {:%H:%M}",
+  "format-alt": " {:%Y-%m-%d}"
+}
+----
+
+=== 82. Recommended visibility policy
+
+[%autowidth, options="header"]
+|===
+| Module state | Recommendation
+| Normal and unimportant | Hide or keep visually neutral
+| Normal but continuously useful | Show
+| Changed state | Show immediately
+| Warning | Show with warning icon
+| Critical | Show persistently
+| Transient action | Show only while active
+| Unknown or unavailable | Show only when diagnosis is useful
+|===
+
+
+Good candidates to hide while inactive:
+
+[%autowidth, options="header"]
+|===
+| Module
+| Microphone
+| Camera
+| Screen recording
+| VPN
+| Package updates
+| Backup errors
+| Bluetooth
+| Media player
+| Notifications
+| Reboot required
+|===
+
+
+=== 83. Icon consistency rules
+
+[%autowidth, options="header"]
+|===
+| Avoid | Prefer
+| Different icon families for every battery level | One consistent Material Design battery family
+| Cloud icon for local backup | Backup or sync icon
+| Warning icon for intentionally disabled state | Off or disabled icon
+| Checkmarks on every healthy module | Blank or neutral normal state
+| Rapidly alternating icons | Stable icon with numeric value
+| Icon-only critical states | Icon plus tooltip or text
+| Reusing shield for every security module | Distinct labels or tooltips
+| Using colour alone | Icon plus colour
+|===
+
+
+=== 84. ASCII fallback set for status bars
+
+[%autowidth, options="header"]
+|===
+| Meaning | Fallback
+| CPU | `CPU`
+| Memory | `MEM`
+| Disk | `DSK`
+| Network | `NET`
+| Wi-Fi | `WIFI`
+| Ethernet | `ETH`
+| VPN | `VPN`
+| Bluetooth | `BT`
+| Volume | `VOL`
+| Muted | `MUTE`
+| Microphone | `MIC`
+| Battery | `BAT`
+| Charging | `CHG`
+| Temperature | `TMP`
+| Brightness | `BRT`
+| Notifications | `NOT`
+| Updates | `UPD`
+| Warning | `!`
+| Error | `ERR`
+| Unknown | `?`
+|===
+
+
+=== 85. Final recommended compact icon vocabulary
+
+For a restrained and coherent desktop bar, this subset is sufficient:
+
+[%autowidth, options="header"]
+|===
+| Function | Icon
+| CPU | 
+| Memory | 󰘚
+| Disk | 󰋊
+| Temperature | 
+| Ethernet | 󰈀
+| Wi-Fi | 󰤨
+| No network | 󰖪
+| VPN | 󰒃
+| Bluetooth | 󰂱
+| Volume | 󰕾
+| Muted | 󰝟
+| Microphone active | 󰍬
+| Brightness | 󰃠
+| Battery | 󰁹
+| Charging | 󰂄
+| Notification | 󰂞
+| Media playing | 󰐊
+| Media paused | 󰏤
+| Package updates | 󰏗
+| Clock | 󰥔
+| Calendar | 
+| Lock | 
+| Power | 
+| Warning | 
+| Error | 
+|===
+
+
+== Cross-application icon design guidelines
+
+This section defines the behavioral rules that apply to both TUI file managers and desktop status applications. It complements the icon lookup tables by specifying how icons should be selected, combined, displayed, themed, and overridden.
+
+=== 86. Semantic consistency
+
+Each icon should have one primary meaning throughout the application.
+
+[%autowidth, options="header"]
+|===
+| Rule | Recommendation
+| One icon, one meaning | Do not use the same icon for unrelated concepts
+| Stable meaning | An icon should retain its meaning across views and modules
+| Related states | Use variants from the same icon family where possible
+| Normal state | Prefer a neutral icon or no icon
+| Exceptional state | Use warning, error, disabled, or disconnected variants
+| Context labels | Use tooltips or text when an icon may be ambiguous
+| Avoid decoration | Do not add icons solely for visual variety
+|===
+
+
+Recommended shared meanings:
+
+[%autowidth, options="header"]
+|===
+| Icon | Meaning
+| 󰄬 | Successful, current, verified, or complete
+| 󰥔 | Pending or waiting
+| 󰑐 | Synchronizing, refreshing, or updating
+|  | Warning
+|  | Error
+| 󰅚 | Critical failure
+| 󰋗 | Unknown or unavailable
+| 󰅖 | Disabled or explicitly off
+| 󰖪 | Disconnected
+|  | Locked or inaccessible
+|  | Link or association
+|===
+
+
+Do not use `󰄬` for every healthy state. Excessive checkmarks create visual noise and reduce the usefulness of success indicators.
+
+=== 87. State precedence
+
+When several states apply to one display position, use the highest-priority state.
+
+[%autowidth, options="header"]
+|===
+| Priority | State class | Examples
+| 1 | Critical failure | Integrity failure, hardware failure, unrecoverable error
+| 2 | Broken or inaccessible object | Broken symlink, permission denied, missing device
+| 3 | Error | Failed operation, backup failure, service failure
+| 4 | Warning | Low battery, low disk space, high temperature
+| 5 | Active operation | Copying, scanning, syncing, updating
+| 6 | Modified or stale state | Git modified, backup outdated, configuration changed
+| 7 | Disabled or disconnected | Muted, offline, Bluetooth disabled
+| 8 | Normal semantic type | File type, network type, power source
+| 9 | Decorative context | Category, application branding
+|===
+
+
+Separate columns should retain independent state. For example:
+
+[%autowidth, options="header"]
+|===
+| Type | Git | Backup | Permission
+| Broken symlink | Modified | Excluded | Inaccessible
+|===
+
+
+The primary icon should still indicate the broken symlink. Git, backup, and permission state should remain in their own columns.
+
+=== 88. Overlay and composition policy
+
+Avoid combining several glyphs into one terminal cell.
+
+[%autowidth, options="header"]
+|===
+| Technique | Recommendation
+| Combining characters | Avoid
+| Zero-width overlays | Avoid
+| Emoji modifiers | Avoid
+| Icon plus superscript | Use only if width is verified
+| Adjacent status columns | Preferred
+| Icon plus text suffix | Acceptable
+| Color-only overlay | Insufficient on its own
+|===
+
+
+Recommended composition:
+
+----
+T  G  B  P  Name
+    link
+----
+
+Avoid:
+
+----
+⃠
+----
+
+The latter may render differently between terminals and fonts.
+
+=== 89. Color semantics
+
+Icons should remain meaningful without color. Color should reinforce, not replace, state.
+
+[%autowidth, options="header"]
+|===
+| Semantic role | Suggested meaning
+| Default foreground | Normal state
+| Dim foreground | Inactive, ignored, or secondary state
+| Accent | Selection or focused state
+| Success | Completed or verified
+| Information | Informational state
+| Warning | Attention required
+| Error | Failed operation
+| Critical | Immediate action required
+| Disabled | Explicitly off or unavailable
+| Modified | Changed or stale state
+|===
+
+
+Applications should use theme role names rather than hard-coded RGB values.
+
+Example theme roles:
+
+[source,toml]
+----
+[colors]
+normal = "foreground"
+dim = "subtle"
+accent = "accent"
+success = "success"
+info = "info"
+warning = "warning"
+error = "error"
+critical = "critical"
+disabled = "disabled"
+modified = "modified"
+----
+
+The icon configuration should refer to roles:
+
+[source,toml]
+----
+[git.modified]
+icon = ""
+color = "modified"
+
+[backup.failed]
+icon = "󰅚"
+color = "error"
+----
+
+=== 90. Accessibility requirements
+
+Important information must not be represented only by an icon or only by color.
+
+[%autowidth, options="header"]
+|===
+| Requirement | Recommendation
+| Text alternative | Provide tooltip, label, or status description
+| ASCII fallback | Required for every important state
+| Monochrome support | All states must remain distinguishable
+| High contrast | Support a stronger warning and selection theme
+| Screen readers | Expose semantic text where the UI framework permits
+| Color blindness | Do not rely on red versus green alone
+| Icon ambiguity | Add a label or tooltip
+| Motion sensitivity | Allow animation to be disabled
+|===
+
+
+Examples:
+
+----
+󰂃 8% battery
+----
+
+----
+ Backup failed
+----
+
+An icon-only display is acceptable only for familiar, low-risk controls such as play, pause, lock, or power, and should still have a tooltip.
+
+=== 91. Nerd Font version policy
+
+The application should state and enforce a supported Nerd Font version range.
+
+[%autowidth, options="header"]
+|===
+| Item | Recommendation
+| Minimum version | Nerd Fonts 3.x
+| Glyph source | Pin to a known release of `glyphnames.json`
+| Code points | Do not silently update between application releases
+| Migration | Document renamed or moved glyphs
+| Missing glyph | Fall back to ASCII or a generic icon
+| User override | Always allow replacement
+| Font check | Optional diagnostic command or settings page
+|===
+
+
+Suggested metadata:
+
+[source,toml]
+----
+[icon_set]
+name = "nerd-fonts"
+minimum_version = "3.0"
+mapping_version = "3.4.0"
+fallback = "ascii"
+----
+
+Avoid depending on glyphs that exist only in unreleased or development versions.
+
+=== 92. Unicode and terminal width handling
+
+Private-use glyphs do not always have consistent width across terminals and fonts.
+
+[%autowidth, options="header"]
+|===
+| Requirement | Recommendation
+| Width measurement | Use terminal cell-width calculation
+| Default field width | Reserve two cells for icon columns
+| Ambiguous-width glyphs | Test explicitly
+| Variation selectors | Avoid
+| Emoji presentation | Avoid
+| Combining characters | Avoid
+| Grapheme segmentation | Treat each configured icon as a grapheme
+| Alignment | Pad after the icon, not before
+| Truncation | Never split an icon grapheme
+| Remote sessions | Support an ASCII-only mode
+|===
+
+
+A robust renderer should support:
+
+----
+icon_width = auto
+icon_column_width = 2
+----
+
+Possible configuration:
+
+[source,toml]
+----
+[rendering]
+icon_width = "auto"
+icon_column_width = 2
+missing_glyph_policy = "ascii"
+emoji = false
+variation_selectors = false
+----
+
+=== 93. Font and glyph diagnostics
+
+Applications should provide a simple diagnostic view.
+
+[%autowidth, options="header"]
+|===
+| Test | Purpose
+| Render all configured icons | Detect missing glyphs
+| Show measured width | Detect alignment problems
+| Show Unicode code point | Aid troubleshooting
+| Show Nerd Font name | Aid configuration
+| Show fallback | Confirm degraded mode
+| Show terminal and locale | Reproduce rendering issues
+|===
+
+
+Example diagnostic table:
+
+----
+Icon  Width  Code point  Name
+     1      U+EA7B      nf-cod-file
+     1      U+EA83      nf-cod-folder
+󰂄     1      U+F0084     nf-md-battery_charging
+----
+
+=== 94. User override model
+
+Users should be able to override every icon category without modifying source code.
+
+[%autowidth, options="header"]
+|===
+| Override scope | Example
+| Global semantic state | Replace warning icon
+| Exact filename | Replace `Makefile` icon
+| Filename pattern | Match `README.*`
+| Compound extension | Replace `.tar.zst`
+| Simple extension | Replace `.rs`
+| MIME type | Replace `application/pdf`
+| Filesystem object | Replace socket icon
+| Directory name | Replace `src` icon
+| Application class | Replace browser icon
+| Waybar module | Replace battery icon
+| Project-local rules | Treat `.bin` as firmware
+| ASCII fallback | Replace fallback character
+|===
+
+
+Recommended precedence:
+
+[%autowidth, options="header"]
+|===
+| Priority | Rule
+| 1 | User project-local override
+| 2 | User global exact filename
+| 3 | User global pattern
+| 4 | Built-in exact filename
+| 5 | Built-in compound extension
+| 6 | Built-in simple extension
+| 7 | MIME or content rule
+| 8 | Generic fallback
+|===
+
+
+Example:
+
+[source,toml]
+----
+[files.exact]
+"Image" = ""
+"Kconfig" = ""
+
+[files.extensions]
+"rs" = ""
+"dtb" = "󰘚"
+"tar.zst" = ""
+
+[project.embedded.extensions]
+"bin" = ""
+"img" = ""
+----
+
+=== 95. Configuration validation
+
+Icon configuration should be validated before use.
+
+[%autowidth, options="header"]
+|===
+| Validation | Required behavior
+| Empty icon | Allow only where blank is intentional
+| Multiple graphemes | Warn unless explicitly permitted
+| Invalid Unicode | Reject
+| Duplicate rule | Report precedence
+| Unknown semantic role | Warn or reject
+| Invalid pattern | Reject with location
+| Unsupported version | Warn
+| Missing fallback | Supply built-in fallback
+| Excessive display width | Warn
+|===
+
+
+A diagnostic command could provide:
+
+----
+icon-config check
+----
+
+Example output:
+
+----
+warning: extension rule "ts" is ambiguous
+warning: icon "☁️" uses an emoji variation selector
+error: color role "danger2" is undefined
+----
+
+=== 96. Tooltip and detail policy
+
+Tooltips should explain the state, not merely repeat the icon.
+
+[%autowidth, options="header"]
+|===
+| Module | Recommended tooltip content
+| Battery | Charge, time remaining, health, power source
+| Network | Interface, address, SSID, signal, route status
+| CPU | Load, frequency, top process
+| Memory | Used, available, swap
+| Temperature | Sensor name, current, warning threshold
+| Audio | Sink/source name, volume, mute state
+| Git | Branch, staged, modified, untracked counts
+| Backup | Last successful run, pending files, repository
+| Storage | Used, free, filesystem, mount point
+| Notifications | Count and do-not-disturb state
+| Updates | Package count and reboot requirement
+|===
+
+
+Bad tooltip:
+
+----
+Battery
+----
+
+Better tooltip:
+
+----
+Battery: 83%, charging, 1 h 42 min until full
+----
+
+=== 97. Compact and responsive layout
+
+Define which elements disappear as available width shrinks.
+
+[%autowidth, options="header"]
+|===
+| Priority | Element | Compact behavior
+| 1 | Critical errors | Always retain
+| 2 | Warning states | Retain
+| 3 | Primary type or module icon | Retain
+| 4 | Essential numeric value | Retain
+| 5 | Short label | Hide when narrow
+| 6 | Secondary status columns | Collapse
+| 7 | Detailed metadata | Hide first
+| 8 | Decorative icons | Hide first
+|===
+
+
+Example file-manager modes:
+
+[%autowidth, options="header"]
+|===
+| Width | Layout
+| Wide | `S T Gᵢ G𝓌 B P Size Modified Name`
+| Medium | `T G B Size Name`
+| Narrow | `T Name`
+| Minimal | ASCII type marker and name
+|===
+
+
+Example status-bar modes:
+
+[%autowidth, options="header"]
+|===
+| Width | Layout
+| Wide | `󰤨 office  󰕾 42%   54°C  󰂄 83%`
+| Medium | `󰤨  󰕾 42   54°  󰂄 83`
+| Narrow | `󰤨 󰕾 󰂄`
+|===
+
+
+=== 98. Animation policy
+
+Animation should be limited to active operations and should be optional.
+
+[%autowidth, options="header"]
+|===
+| State | Animation
+| Synchronizing | Optional spinner or rotating icon
+| Scanning | Optional spinner
+| Copying | Optional progress animation
+| Recording | Stable recording indicator preferred
+| Warning | No animation
+| Error | No animation
+| Normal state | No animation
+| Battery charging | Stable charging icon preferred
+| Network traffic | Numeric update preferred over animation
+|===
+
+
+Recommended limits:
+
+[%autowidth, options="header"]
+|===
+| Setting | Recommendation
+| Maximum refresh | 4 frames per second
+| Default refresh | 1 to 2 frames per second
+| Reduced-motion mode | Disable all animation
+| Background status | Prefer static icon
+| Terminal over SSH | Disable animation by default
+|===
+
+
+=== 99. Update cadence for status modules
+
+Status modules should update only as often as their data changes meaningfully.
+
+[%autowidth, options="header"]
+|===
+| Module | Typical interval
+| Clock with seconds | 1 second
+| Clock without seconds | 30 to 60 seconds
+| CPU load | 1 to 2 seconds
+| Memory | 2 to 5 seconds
+| Network throughput | 1 to 2 seconds
+| Battery | 10 to 30 seconds
+| Temperature | 2 to 10 seconds
+| Disk capacity | 30 to 120 seconds
+| Package updates | 15 to 60 minutes
+| Weather | 15 to 60 minutes
+| Backup status | On event or 1 to 5 minutes
+| Git status | On filesystem event or directory change
+| Bluetooth devices | On event
+| Audio state | On event
+|===
+
+
+Prefer event-driven updates where system APIs provide notifications.
+
+=== 100. Performance and caching
+
+Icon lookup should never become a visible file-manager bottleneck.
+
+[%autowidth, options="header"]
+|===
+| Area | Recommendation
+| Exact filenames | Hash map
+| Extensions | Hash map or suffix trie
+| Compound extensions | Longest-suffix trie
+| Patterns | Precompiled glob set
+| MIME detection | Lazy and bounded
+| Magic detection | Cache by inode, size, and modification time
+| Git status | Batch query per repository
+| Backup status | Batch query per backup root
+| Directory icons | Cache by basename and context
+| Rendering | Cache resolved icon and width
+| Configuration reload | Atomic replacement
+|===
+
+
+Avoid running `file(1)` separately for every entry. Use an in-process magic database or batched worker pool when content inspection is required.
+
+=== 101. Testing matrix
+
+The icon set should be tested across terminals, fonts, sessions, and locales.
+
+[%autowidth, options="header"]
+|===
+| Category | Recommended coverage
+| Terminals | Kitty, foot, Alacritty, WezTerm
+| Multiplexers | tmux, Zellij
+| Remote | SSH with and without locale forwarding
+| Fonts | At least two Nerd Font families
+| Font versions | Oldest supported and latest supported
+| Display scale | 100%, HiDPI
+| Locales | UTF-8 English and at least one non-English locale
+| Color | Full color, monochrome, high contrast
+| Width | Wide, medium, narrow
+| Shells | Bash, Zsh, Fish
+| Platforms | Linux primary, optional BSD/macOS
+| Wayland compositors | Hyprland, Sway, GNOME/KDE where relevant
+|===
+
+
+Test cases should include:
+
+----
+ASCII-only mode
+Missing glyph mode
+Two-cell glyph rendering
+Broken symlink
+Ambiguous extension
+Long compound extension
+Git conflict
+Backup failure
+Critical battery
+Disconnected network
+Muted audio
+----
+
+=== 102. Remote and virtual filesystems
+
+Remote and virtual filesystems benefit from distinct semantic icons.
+
+[%autowidth, options="header"]
+|===
+| Filesystem or state | Icon | Nerd Font name
+| SSHFS | 󰣀 | `nf-md-console_network_outline`
+| NFS | 󰖩 | `nf-md-lan_connect`
+| CIFS or SMB | 󰖩 | `nf-md-lan_connect`
+| WebDAV | 󰖟 | `nf-md-web`
+| FUSE filesystem | 󰋊 | `nf-md-harddisk`
+| Encrypted mount |  | `nf-fa-lock`
+| Removable media |  | `nf-fa-hdd_o`
+| Optical media |  | `nf-fae-disc`
+| Network mount unavailable | 󰖪 | `nf-md-lan_disconnect`
+| Read-only mount | 󰌾 | `nf-md-lock_outline`
+| Automount pending | 󰥔 | `nf-md-clock_outline`
+| Mount error |  | `nf-cod-error`
+| Overlay filesystem | 󰘚 | `nf-md-file_tree`
+| Container mount |  | `nf-oct-container`
+|===
+
+
+Use a separate mount-state column when the normal directory icon must remain visible.
+
+=== 103. Additional version-control systems
+
+Git should not be the only supported version-control vocabulary.
+
+[%autowidth, options="header"]
+|===
+| System | Repository icon | Branch or workspace icon | Notes
+| Git |  |  | Primary mapping
+| Mercurial | 󰘬 |  | Reuse generic repository semantics
+| Subversion | 󰘬 | 󰘬 | Centralized VCS
+| Fossil | 󰘬 |  | Repository and ticket system
+| Perforce | 󰘬 | 󰘬 | Workspace-oriented
+| Jujutsu | 󰘬 |  | Commit-centric
+| Darcs | 󰘬 |  | Patch-centric
+|===
+
+
+Per-file states should use the same semantic icons where the meanings match:
+
+[%autowidth, options="header"]
+|===
+| Semantic state | Icon
+| Added | 
+| Modified | 
+| Removed | 
+| Renamed | 
+| Conflict | 
+| Ignored | 
+| Unknown or untracked | 
+|===
+
+
+=== 104. Cloud, synchronization, and remote-file states
+
+Backup and synchronization are related but not identical.
+
+[%autowidth, options="header"]
+|===
+| State | Icon | Nerd Font name
+| Local and synchronized | 󰄬 | `nf-md-check`
+| Synchronization pending | 󰥔 | `nf-md-clock_outline`
+| Synchronizing | 󰑐 | `nf-md-sync`
+| Conflict |  | `nf-cod-git_merge`
+| Remote-only |  | `nf-cod-cloud`
+| Local-only | 󰉋 | `nf-md-folder_outline`
+| Offline copy available | 󰄬 | `nf-md-check`
+| Remote unavailable | 󰅟 | `nf-md-cloud_off_outline`
+| Authentication required | 󰌆 | `nf-md-key`
+| Quota warning |  | `nf-fa-warning`
+| Sync failure | 󰅚 | `nf-md-alert_circle_outline`
+| Excluded from sync |  | `nf-cod-exclude`
+|===
+
+
+Do not use the cloud icon for local backup repositories.
+
+=== 105. Privacy indicators
+
+Privacy-sensitive resources should use temporary, high-priority indicators.
+
+[%autowidth, options="header"]
+|===
+| Resource | Active | Disabled or unavailable
+| Microphone | 󰍬 | 󰍭
+| Camera |  | 󰄀
+| Screen capture | 󰍹 | 󰶐
+| Location | 󰍎 | 󰍐
+| Clipboard access | 󰅍 | —
+| Remote control | 󰍹 | 󰖪
+|===
+
+
+Rules:
+
+[%autowidth, options="header"]
+|===
+| Rule | Recommendation
+| Visibility | Show only while active
+| Priority | Higher than routine status modules
+| Tooltip | Identify the accessing process when possible
+| Color | Use a warning or privacy role
+| Logging | Optional recent-access history
+| Interaction | Clicking should show details or controls
+|===
+
+
+=== 106. Security indicators
+
+Security icons should communicate specific state and not merely decorate the interface.
+
+[%autowidth, options="header"]
+|===
+| State | Icon | Nerd Font name
+| Encrypted storage |  | `nf-fa-lock`
+| Verified or trusted state | 󰒃 | `nf-md-shield_check`
+| Verification failed | 󰒄 | `nf-md-shield_off_outline`
+| Elevated privileges | 󰌆 | `nf-md-key`
+| Firewall active | 󰒃 | `nf-md-shield_check`
+| Firewall disabled | 󰒄 | `nf-md-shield_off_outline`
+| Secure connection | 󰌾 | `nf-md-lock_outline`
+| Insecure connection |  | `nf-fa-unlock`
+| Certificate warning |  | `nf-fa-warning`
+| Certificate failure |  | `nf-cod-error`
+| TPM available | 󰒃 | `nf-md-shield_check`
+| Secure Boot verified | 󰒃 | `nf-md-shield_check`
+|===
+
+
+Where several security modules use the same shield icon, include a short label or distinct tooltip.
+
+=== 107. Hardware and peripheral indicators
+
+[%autowidth, options="header"]
+|===
+| Device or state | Icon | Nerd Font name
+| USB device | 󰕓 | `nf-md-usb`
+| USB disconnected | 󰕔 | `nf-md-usb_off`
+| Serial port | 󰣀 | `nf-md-console_network_outline`
+| Keyboard | 󰌌 | `nf-md-keyboard`
+| Mouse | 󰍽 | `nf-md-mouse`
+| Touchpad | 󰟸 | `nf-md-gesture_tap`
+| Gamepad | 󰊴 | `nf-md-gamepad_variant`
+| Camera |  | `nf-fa-camera`
+| Printer |  | `nf-fa-print`
+| Scanner | 󰚫 | `nf-md-scanner`
+| Dock connected | 󰍹 | `nf-md-monitor`
+| External monitor | 󰍺 | `nf-md-monitor_multiple`
+| Removable drive |  | `nf-fa-hdd_o`
+| SD card | 󰟜 | `nf-md-sd`
+| Smart card | 󰘦 | `nf-md-card_account_details_outline`
+| Hardware warning |  | `nf-fa-warning`
+|===
+
+
+=== 108. Localization policy
+
+Icons should not depend on language-specific wordplay or culturally narrow metaphors.
+
+[%autowidth, options="header"]
+|===
+| Requirement | Recommendation
+| Labels | Keep all labels translatable
+| Tooltips | Use localized full descriptions
+| Units | Respect locale preferences
+| Dates | Respect locale and user format
+| Directionality | Test right-to-left layouts when supported
+| Abbreviations | Avoid hard-coded English abbreviations where possible
+| Icon meaning | Prefer globally recognizable concepts
+| ASCII fallback | Permit localized text fallback
+|===
+
+
+The icon itself should remain stable while the associated label changes with locale.
+
+=== 109. Machine-readable configuration example
+
+The configuration should separate semantic state from file mappings and module mappings.
+
+[source,toml]
+----
+[meta]
+format_version = 1
+icon_set = "nerd-fonts"
+minimum_nerd_font_version = "3.0"
+mapping_version = "3.4.0"
+
+[rendering]
+icon_column_width = 2
+icon_width = "auto"
+fallback_mode = "ascii"
+emoji = false
+variation_selectors = false
+animations = true
+
+[semantic]
+success = "󰄬"
+pending = "󰥔"
+syncing = "󰑐"
+warning = ""
+error = ""
+critical = "󰅚"
+unknown = "󰋗"
+disabled = "󰅖"
+disconnected = "󰖪"
+locked = ""
+link = ""
+
+[filesystem]
+file = ""
+text = ""
+binary = ""
+executable = ""
+directory = ""
+directory_open = ""
+symlink_file = ""
+symlink_directory = ""
+symlink_broken = "󰌺"
+socket = "󰖩"
+fifo = "󰟥"
+block_device = ""
+character_device = ""
+
+[git]
+untracked = ""
+added = ""
+modified = ""
+deleted = ""
+renamed = ""
+ignored = ""
+conflict = ""
+
+[backup]
+current = ""
+verified = "󰒃"
+stale = "󰑐"
+pending = "󰥔"
+excluded = ""
+failed = "󰅚"
+unknown = "󰋗"
+
+[waybar]
+cpu = ""
+memory = "󰘚"
+disk = "󰋊"
+temperature = ""
+ethernet = "󰈀"
+wifi = "󰤨"
+network_disconnected = "󰖪"
+volume = "󰕾"
+volume_muted = "󰝟"
+microphone = "󰍬"
+battery = "󰁹"
+battery_charging = "󰂄"
+notifications = "󰂞"
+clock = "󰥔"
+power = ""
+
+[fallbacks]
+file = "f"
+directory = "/"
+symlink = "@"
+socket = "="
+fifo = "|"
+block_device = "#"
+character_device = "%"
+warning = "!"
+error = "E"
+critical = "X"
+unknown = "?"
+----
+
+=== 110. Reference glossary schema
+
+A generated glossary should contain one row per glyph.
+
+[%autowidth, options="header"]
+|===
+| Field | Description
+| Semantic key | Stable application identifier
+| Glyph | Rendered character
+| Nerd Font name | Canonical glyph name
+| Unicode code point | Numeric code point
+| Meaning | Primary semantic meaning
+| Category | File type, state, module, action
+| Width | Measured cell width
+| ASCII fallback | Non-Nerd-Font replacement
+| Minimum version | First supported Nerd Font version
+| Deprecated | Whether the mapping should be replaced
+| Notes | Ambiguity or usage restrictions
+|===
+
+
+Example:
+
+[%autowidth, options="header"]
+|===
+| Key | Glyph | Nerd Font name | Code point | Meaning | Fallback
+| `filesystem.file` |  | `nf-cod-file` | `U+EA7B` | Generic file | `f`
+| `filesystem.directory` |  | `nf-cod-folder` | `U+EA83` | Directory | `/`
+| `semantic.warning` |  | `nf-fa-warning` | `U+F071` | Warning | `!`
+| `semantic.error` |  | `nf-cod-error` | `U+EA87` | Error | `E`
+|===
+
+
+The glossary should preferably be generated from the same data used by the application to avoid documentation drift.
+
+=== 111. Recommended document organization
+
+For long-term maintenance, the guideline can be split into three logical documents:
+
+[%autowidth, options="header"]
+|===
+| Document | Scope
+| Icon semantics and design rules | Precedence, color, accessibility, width, versioning, overrides
+| File manager mappings | Files, directories, extensions, Git, backup, permissions
+| Status application mappings | Waybar, hardware, network, media, power, notifications
+|===
+
+
+The current combined document remains useful as a single reference, but the rule data should come from a shared machine-readable source.
+
+[#open-issues]
+== Open issues
+
+((OI-002)) The file formats shown in this reference --
+<<_91_nerd_font_version_policy>>, <<_92_unicode_and_terminal_width_handling>>,
+and <<_109_machine_readable_configuration_example>> -- are illustrative examples
+of the *content* a configuration must carry, not a specification of the format
+itself. The canonical format, schema, and location of the shared rule-data file
+-- the single source of truth read by `wfm`, the Neovim configuration, the
+Waybar setup, and the exporters -- shall be settled separately; the dev-tools
+suite's configuration convention is KDL (`devtools-kdl`), so the concrete file
+is expected to be KDL regardless of the TOML used for illustration here.
+<<_111_recommended_document_organization>> also proposes splitting this reference
+into semantics, file-manager, and status-application documents once the system
+stabilizes; that split is deferred.
+
+[glossary]
+== Glossary
+
+[glossary]
+Nerd Font:: A patched font that adds a large set of developer and UI glyphs in
+the Unicode private-use area. Glyphs are named by class (`nf-md-*` Material
+Design, `nf-oct-*` Octicons, `nf-cod-*` Codicons, `nf-fa-*` Font Awesome,
+`nf-seti-*` Seti-UI, `nf-custom-*`), and the code point behind a name can differ
+between Nerd Font releases (<<_91_nerd_font_version_policy>>).
+
+Status overlay:: A glyph shown in a dedicated position beside the primary icon,
+reporting a current condition of the object -- filesystem, permission, Git, or
+backup state for a file; warning, error, or disconnected state for a status
+module -- rather than its kind. Status overlays are independent of the primary
+icon and of each other.
+
+Status module:: A single unit of a status application (such as a Waybar bar):
+one resource or system state -- clock, CPU, battery, network -- with its own icon
+and its own state overlay drawn from the shared semantic vocabulary.
+
+Semantic vocabulary:: The small set of state meanings (success, pending, syncing,
+warning, error, critical, unknown, disabled, disconnected) that every consumer
+maps to one glyph each (<<_78_common_alert_vocabulary>>,
+<<_86_semantic_consistency>>), so a state reads the same across applications.
+
+Compound extension:: A multi-part file suffix matched as a unit, such as
+`.tar.gz`, `.d.ts`, or `.dtb.gz`. Compound extensions are matched before the
+trailing simple extension (<<_1_rule_precedence>>, <<_46_extension_normalization>>).
+
+Magic bytes:: The leading bytes of a file that identify its format independently
+of its name, read within the bounded window defined in <<_41_magic_and_content_rules>>
+when name-based rules do not resolve.
+
+== References
+
+* xref:../../architecture/DEV-TOOLS-ARCH-0012-file-manager/DEV-TOOLS-ARCH-0012-file-manager.adoc[DEV-TOOLS-ARCH-0012] --
+  workspace file manager architecture; the first consumer of this icon system.
+* Nerd Fonts -- https://www.nerdfonts.com/[nerdfonts.com]; the glyph classes and
+  code points this reference names.
+* Waybar -- https://github.com/Alexays/Waybar[github.com/Alexays/Waybar]; the
+  status bar the status-application rules target.
