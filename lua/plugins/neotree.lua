@@ -1,10 +1,36 @@
 local git = require("utils.icons").git
+local ft = require("utils.ftype_icons")
 
 local neotree_opts = {
 	close_if_last_window = true,
 
-	-- Per-file git glyphs from the shared icon table (DEV-TOOLS-DES-0004 §35).
+	-- Icon glyphs from the shared spec tables (DEV-TOOLS-DES-0004 §2/§4-6/§35).
 	default_component_configs = {
+		icon = {
+			folder_closed = ft.folder.closed,
+			folder_open = ft.folder.open,
+			folder_empty = ft.folder.empty,
+			-- Wrap the default provider: directory-name glyphs (§4-6) for
+			-- folders, devicons for files (behaviour otherwise unchanged).
+			provider = function(icon, node, state)
+				if node.type == "directory" then
+					local g = ft.by_directory[(node.name or ""):lower()]
+					if g then
+						icon.text = g
+					end
+					return
+				end
+				if node.type == "file" or node.type == "terminal" then
+					local ok, dev = pcall(require, "nvim-web-devicons")
+					local name = node.type == "terminal" and "terminal" or node.name
+					if ok then
+						local devicon, hl = dev.get_icon(name)
+						icon.text = devicon or icon.text
+						icon.highlight = hl or icon.highlight
+					end
+				end
+			end,
+		},
 		git_status = {
 			symbols = {
 				added = git.added,
