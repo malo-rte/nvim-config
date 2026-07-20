@@ -38,6 +38,7 @@ return {
 			{ "<leader>gr", group = "Rebase" },
 			{ "<leader>i", group = "Insert" },
 			{ "<leader>in", group = "Insert Nerdfont" },
+			{ "<leader>o", group = "Obsidian/Notes" },
 			{ "<leader>w", group = "Windows" },
 			{ "<leader>q", group = "Sessions" },
 			{ "<leader>t", group = "Toggle" },

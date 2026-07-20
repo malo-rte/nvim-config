@@ -8,6 +8,21 @@ vim.api.nvim_create_autocmd("TextYankPost", {
 	end,
 })
 
+-- Prose ergonomics for markdown notes: soft-wrap on word boundaries, conceal
+-- markup (wikilinks/formatting), and spell-check. render-markdown manages its
+-- own conceal while rendering; this covers plain editing and wikilink display.
+vim.api.nvim_create_autocmd("FileType", {
+	group = vim.api.nvim_create_augroup("MarkdownNotes", { clear = true }),
+	pattern = { "markdown", "markdown.mdx" },
+	callback = function()
+		vim.opt_local.wrap = true
+		vim.opt_local.linebreak = true
+		vim.opt_local.breakindent = true
+		vim.opt_local.conceallevel = 2
+		vim.opt_local.spell = true
+	end,
+})
+
 -- Make window separators brighter
 vim.api.nvim_create_autocmd("ColorScheme", {
 	callback = function()

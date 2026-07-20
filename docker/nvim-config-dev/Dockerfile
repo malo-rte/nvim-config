@@ -35,6 +35,8 @@ ARG DEV_PACKAGES="\
     libncurses-dev \
     zlib1g-dev \
     libnuma-dev \
+    nodejs \
+    npm \
 "
 
 RUN apt-get update && \
@@ -82,6 +84,13 @@ RUN set -eux; \
     rm /tmp/tree-sitter.gz; \
     chmod +x /usr/local/bin/tree-sitter; \
     tree-sitter --version
+
+# markmap-cli: markmap.nvim shells out to it to render markdown as a browser
+# mindmap. Installed globally from the node/npm added to DEV_PACKAGES. NixOS
+# should provide markmap-cli via nix instead.
+RUN set -eux; \
+    npm install -g markmap-cli; \
+    markmap --version
 
 RUN set -eux; \
     usermod -aG sudo "${USER_NAME}"; \
