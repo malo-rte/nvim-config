@@ -7,6 +7,11 @@ vim.api.nvim_create_autocmd("LspAttach", {
 		-- client.server_capabilities.documentFormattingProvider = false
 		-- client.server_capabilities.documentRangeFormattingProvider = false
 
+		-- Native LSP color swatches (Neovim 0.12+), e.g. css/tailwind.
+		if vim.lsp.document_color and client:supports_method("textDocument/documentColor") then
+			vim.lsp.document_color.enable(true, { bufnr = ev.buf })
+		end
+
 		local tsb = require("telescope.builtin")
 
 		local function map(keys, func, desc)

@@ -38,6 +38,7 @@ vim.opt.showmode = false -- Don't show mode in command line
 vim.opt.pumheight = 10 -- Pop-up menu height
 vim.opt.pumblend = 10 -- Pop-up menu transparency
 vim.opt.winblend = 0 -- Floating window transparency
+vim.opt.winborder = "rounded" -- Default border for all floating windows (0.11+)
 vim.opt.conceallevel = 0 -- Don't hide markup
 vim.opt.lazyredraw = false -- Redraw while executing macros
 vim.opt.redrawtime = 10000 -- Timeout for syntax highlighting redraw

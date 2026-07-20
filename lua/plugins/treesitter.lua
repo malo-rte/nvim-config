@@ -48,7 +48,6 @@ local langs = {
 	"sql",
 	"ssh_config",
 	"terraform",
-	"tmux"
 }
 
 return {
@@ -67,7 +66,7 @@ return {
 				-- versions can lag and throw "invalid node type" query errors
 				-- (e.g. the cmdline vim parser). nix only fills the gaps.
 				-- nixpkgs does not package every grammar (gnuplot, gpg, idl,
-				-- kconfig, m68k, objdump, promql, ssh_config, terraform, tmux),
+				-- kconfig, m68k, objdump, promql, ssh_config, terraform),
 				-- so those filetypes have no treesitter here.
 				vim.opt.runtimepath:append(env.parser_dir)
 			else
