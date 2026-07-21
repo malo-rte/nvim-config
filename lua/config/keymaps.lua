@@ -60,15 +60,10 @@ vim.keymap.set("n", "<leader>xX", function()
 	diagnostics_list({ bufnr = 0 })
 end, { desc = "Diagnostics: current buffer" })
 
--- UI / toggles (<leader>u): one home for all editor toggles. Inlay hints live
--- in the LSP attach (buffer-local) as <leader>uh; indent-scope toggles are in
--- the mini.indentscope plugin as <leader>ui / uI.
-local function toggle_buffer_format_on_save()
-	vim.b.enable_format_on_save = not vim.b.enable_format_on_save
-	vim.notify("Format on save: " .. (vim.b.enable_format_on_save and "ON" or "OFF") .. " for this buffer")
-end
-vim.api.nvim_create_user_command("FormatOnSaveToggle", toggle_buffer_format_on_save, {})
-vim.keymap.set("n", "<leader>uf", toggle_buffer_format_on_save, { desc = "Toggle: format on save (buffer)" })
+-- UI / toggles (<leader>u): one home for all editor toggles. Format-on-save
+-- toggles (<leader>uf file, uF project, ud clear) live in config.autoformat;
+-- inlay hints in the LSP attach as <leader>uh; indent-scope in
+-- mini.indentscope as <leader>ui / uI.
 vim.keymap.set("n", "<leader>us", function()
 	vim.opt_local.spell = not vim.opt_local.spell:get()
 end, { desc = "Toggle: spell" })

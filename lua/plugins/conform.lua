@@ -70,8 +70,10 @@ return {
 				},
 			},
 
+			-- Layered per-file / per-project / committed-marker decision, see
+			-- lua/config/autoformat.lua (toggles: <leader>uf file, uF project).
 			format_on_save = function(bufnr)
-				if vim.b[bufnr].enable_format_on_save then
+				if require("config.autoformat").enabled(bufnr) then
 					return {
 						timeout_ms = 1500,
 						lsp_format = "never",
