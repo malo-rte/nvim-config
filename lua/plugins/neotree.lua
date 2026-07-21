@@ -105,6 +105,8 @@ return {
 				end
 				vim.cmd(cmd)
 			end, { desc = "Explorer: at project root" })
+
+            vim.keymap.set("n", "<leader>gS", ":Neotree git_status<CR>"
 		end,
 	},
 
