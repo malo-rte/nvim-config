@@ -29,6 +29,7 @@ local langs = {
 	"jq",
 	"json",
 	"kconfig",
+	"kdl",
 	"latex",
 	"llvm",
 	"lua",
