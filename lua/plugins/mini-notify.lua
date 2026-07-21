@@ -44,5 +44,10 @@ return {
         local plugin = require("mini.notify")
 
         plugin.setup(o)
+
+        -- Show the notification history (everything that flashed by).
+        vim.keymap.set("n", "<leader>un", function()
+            plugin.show_history()
+        end, { desc = "Notifications: history" })
     end,
 }
