@@ -22,7 +22,10 @@ return {
 	opts = {
 		default_mappings = false,
 		default_commands = true, -- :GitConflictListQf etc. still available
-		disable_diagnostics = true, -- markers break syntax; quiet the LSP while resolving
+		-- Keep diagnostics ON so config.mergediag can surface the conflict
+		-- markers as diagnostics. (Setting this true calls vim.diagnostic.disable
+		-- on the buffer, which would hide those too -- and it's deprecated in 0.12.)
+		disable_diagnostics = false,
 		list_opener = "copen",
 		highlights = {
 			incoming = "DiffAdd",
