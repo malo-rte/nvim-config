@@ -42,7 +42,10 @@ local opts = {
 				end,
 				color = function()
 					local ok, af = pcall(require, "config.autoformat")
-					return (ok and af.enabled(0)) and "DiagnosticOk" or "Comment"
+					local group = (ok and af.enabled(0)) and "DiagnosticOk" or "Comment"
+					local hl = vim.api.nvim_get_hl(0, { name = group, link = false })
+					local fg = hl.fg or hl.foreground
+					return fg and { fg = string.format("#%06x", fg) } or nil
 				end,
 			},
 			{
