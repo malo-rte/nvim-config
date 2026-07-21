@@ -15,7 +15,10 @@ end
 -- lua/config/lsp.lua (which enables exactly these).
 local function configured_servers()
 	local names = {}
-	for _, path in ipairs(vim.api.nvim_get_runtime_file("lsp/*.lua", true)) do
+	-- Only our own lsp/ configs (scope to the config dir, not the whole
+	-- runtimepath -- else plugins that ship lsp/*.lua leak in, e.g.
+	-- mason-lspconfig's omnisharp_mono).
+	for _, path in ipairs(vim.fn.globpath(vim.fn.stdpath("config") .. "/lsp", "*.lua", false, true)) do
 		local name = vim.fs.basename(path):gsub("%.lua$", "")
 		if not name:match("^_") then
 			names[#names + 1] = name

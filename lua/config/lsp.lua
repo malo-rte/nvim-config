@@ -75,10 +75,13 @@ if ok then
 	})
 end
 
--- Enable all LSPs that have a config file in lsp/*.lua
+-- Enable all LSPs that have a config file in *our* lsp/ dir. Scope to the
+-- config directory rather than the whole runtimepath, or plugins that ship
+-- lsp/*.lua (e.g. mason-lspconfig's omnisharp_mono) get enabled too and try to
+-- launch uninstalled servers (exit code 127).
 local enabled = {}
 
-local lsp_files = vim.api.nvim_get_runtime_file("lsp/*.lua", true)
+local lsp_files = vim.fn.globpath(vim.fn.stdpath("config") .. "/lsp", "*.lua", false, true)
 for _, path in ipairs(lsp_files) do
 	local name = vim.fs.basename(path):gsub("%.lua$", "")
 
