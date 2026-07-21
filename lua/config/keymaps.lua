@@ -39,6 +39,25 @@ vim.keymap.set("n", "<leader>qc", "<cmd>cclose<CR>", { desc = "Close quickfix" }
 vim.keymap.set("n", "<leader>qn", "<cmd>cnext<CR>", { desc = "Next quickfix item" })
 vim.keymap.set("n", "<leader>qp", "<cmd>cprev<CR>", { desc = "Previous quickfix item" })
 
+-- Diagnostics list (global -- not LSP-scoped, so it also covers nvim-lint
+-- diagnostics in buffers with no LSP client). Falls back to the quickfix
+-- list if Telescope is unavailable.
+local function diagnostics_list(opts)
+	local ok, tb = pcall(require, "telescope.builtin")
+	if ok then
+		tb.diagnostics(opts)
+	else
+		vim.diagnostic.setqflist(opts and opts.bufnr and { bufnr = opts.bufnr } or {})
+		vim.cmd("copen")
+	end
+end
+vim.keymap.set("n", "<leader>cd", function()
+	diagnostics_list()
+end, { desc = "Diagnostics: list (workspace)" })
+vim.keymap.set("n", "<leader>cD", function()
+	diagnostics_list({ bufnr = 0 })
+end, { desc = "Diagnostics: list (current buffer)" })
+
 -- Toggle format on save (per buffer)
 local function toggle_buffer_format_on_save()
 	vim.b.enable_format_on_save = not vim.b.enable_format_on_save
