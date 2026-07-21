@@ -30,10 +30,12 @@ local opts = {
 		},
 
 		lualine_x = {
-			-- format-on-save indicator: green when on, dim when off
+			-- format-on-save indicator: auto-fix glyph (green) when on, slashed
+			-- glyph (dim) when off -- readable with or without colour.
 			{
 				function()
-					return icons.autoformat
+					local ok, af = pcall(require, "config.autoformat")
+					return (ok and af.enabled(0)) and icons.autoformat.on or icons.autoformat.off
 				end,
 				cond = function()
 					return vim.bo.buftype == ""

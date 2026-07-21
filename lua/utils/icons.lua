@@ -106,8 +106,9 @@ M.lsp_kind = {
 	TypeParameter = "󰬛",
 }
 
--- Autoformat (format-on-save) status indicator -- editor-local
--- (nf-md-auto_fix U+F0068). Shown in the statusline, coloured by state.
-M.autoformat = "󰁨"
+-- Autoformat (format-on-save) status indicator -- editor-local. Shown in
+-- the statusline: on = nf-md-auto_fix (U+F0068), off = nf-md-cancel /
+-- slashed (U+F073A), so the state reads without relying on colour.
+M.autoformat = { on = "󰁨", off = "󰜺" }
 
 return M
