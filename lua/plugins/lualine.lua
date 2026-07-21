@@ -30,6 +30,19 @@ local opts = {
 		},
 
 		lualine_x = {
+			-- format-on-save indicator: green when on, dim when off
+			{
+				function()
+					return icons.autoformat
+				end,
+				cond = function()
+					return vim.bo.buftype == ""
+				end,
+				color = function()
+					local ok, af = pcall(require, "config.autoformat")
+					return (ok and af.enabled(0)) and "DiagnosticOk" or "Comment"
+				end,
+			},
 			{
 				"diagnostics",
 				sources = { "nvim_diagnostic" },
