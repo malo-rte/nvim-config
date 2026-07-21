@@ -109,6 +109,10 @@ RUN curl -fsSL https://claude.ai/install.sh | bash
 # libpcsclite-dev, libusb-1.0-0-dev) come from dev-tools-build.
 RUN cargo install --locked age-plugin-yubikey
 
+# kdlfmt: the KDL formatter conform.nvim runs on save (lua/plugins/conform.lua).
+# Rust tool; the toolchain comes from dev-tools-build. NixOS provides it via nix.
+RUN cargo install --locked kdlfmt
+
 # Haskell toolchain via ghcup: ghc + cabal + haskell-language-server, so
 # lsp/hls.lua's haskell-language-server-wrapper can actually start. Large
 # layer (GHC + HLS are multi-GB). The GHC bindist's link/runtime libs
