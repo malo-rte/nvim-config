@@ -56,6 +56,7 @@ return {
 		{ "nvim-telescope/telescope-fzf-native.nvim", build = "make", cond = vim.fn.executable("make") == 1 },
 		{ "nvim-telescope/telescope-frecency.nvim" },
 		{ "kkharji/sqlite.lua", enabled = true }, -- speeds up telescope-frecency
+		{ "nvim-telescope/telescope-ui-select.nvim" }, -- route vim.ui.select through Telescope
 	},
 	opts = opts,
 
@@ -63,8 +64,14 @@ return {
 		local ts = require("telescope")
 		local tb = require("telescope.builtin")
 		local project = require("config.project")
+
+		-- Route vim.ui.select (LSP code actions, etc.) through Telescope so it
+		-- navigates with the same arrow/Ctrl-n/p keys as every other picker.
+		o.extensions = o.extensions or {}
+		o.extensions["ui-select"] = require("telescope.themes").get_dropdown({})
 		ts.setup(o)
 
+		ts.load_extension("ui-select")
 		ts.load_extension("frecency")
 
 		local ok = pcall(ts.load_extension, "fzf")

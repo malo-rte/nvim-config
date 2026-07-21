@@ -30,6 +30,15 @@ vim.keymap.set("n", "<leader>ba", "<cmd>wall<cr>", { desc = "Save all modified b
 -- Clear search highlight
 vim.keymap.set("n", "<Esc>", "<cmd>nohlsearch<CR><Esc>", { desc = "Clear search highlight" })
 
+-- Command-line wildmenu: <Up>/<Down> drive the completion popup while it is
+-- open (like the other menus), and fall back to command history otherwise.
+vim.keymap.set("c", "<Down>", function()
+	return vim.fn.wildmenumode() == 1 and "<C-n>" or "<Down>"
+end, { expr = true })
+vim.keymap.set("c", "<Up>", function()
+	return vim.fn.wildmenumode() == 1 and "<C-p>" or "<Up>"
+end, { expr = true })
+
 -- Better paste when in visual selection
 vim.keymap.set("v", "p", '"_dP', { desc = "Paste without overwriting yank register" })
 
