@@ -30,6 +30,8 @@ return {
 		wk.add({
 			{ "<leader>b", group = "Buffers" },
 			{ "<leader>c", group = "Code" },
+			{ "<leader>cd", desc = "Diagnostics: workspace" },
+			{ "<leader>cD", desc = "Diagnostics: current buffer" },
 			{ "<leader>d", group = "Debug" },
 			{ "<leader>ct", group = "Toggle" },
 			{ "<leader>f", group = "Find/File" },
