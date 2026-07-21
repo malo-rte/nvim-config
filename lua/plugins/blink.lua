@@ -4,7 +4,7 @@ local icons = require("utils.icons")
 return {
   "Saghen/blink.cmp",
   version = "1.*",
-  event = "InsertEnter",
+  event = { "InsertEnter", "CmdlineEnter" },
   opts = {
     appearance = {
       nerd_font_variant = "mono",
@@ -65,6 +65,21 @@ return {
 
     sources = {
       default = {  "lsp", "path", "snippets", "buffer" },
+    },
+
+    -- Command-line (`:`) completion uses the same blink menu as insert mode.
+    -- auto_show makes it appear as you type (blink only shows it in cmdwin by
+    -- default), and <Up>/<Down> are added so it navigates like every other
+    -- menu (the cmdline preset only binds <Left>/<Right> + <C-n>/<C-p>).
+    cmdline = {
+      keymap = {
+        preset = "cmdline",
+        ["<Up>"] = { "select_prev", "fallback" },
+        ["<Down>"] = { "select_next", "fallback" },
+      },
+      completion = {
+        menu = { auto_show = true },
+      },
     },
   },
 
