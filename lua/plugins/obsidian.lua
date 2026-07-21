@@ -3,9 +3,9 @@
 -- Display is left to render-markdown.nvim (obsidian's own UI is disabled to
 -- avoid double conceal/rendering). Search/switch use your existing Telescope.
 --
--- Vault location: change the workspace path below to point at your vault.
-local vault = vim.fn.expand("~/notes")
-
+-- The vault is per-project: the workspace resolves to the current project's
+-- `.vault/` (created + git-ignored on demand by config.vault). Open it with
+-- <leader>ov / :Vault. See lua/config/vault.lua.
 return {
 	"obsidian-nvim/obsidian.nvim",
 	version = "*",
@@ -15,7 +15,12 @@ return {
 	---@type obsidian.config
 	opts = {
 		workspaces = {
-			{ name = "notes", path = vault },
+			{
+				name = "project",
+				path = function()
+					return require("config.vault").ensure()
+				end,
+			},
 		},
 		notes_subdir = "notes",
 		new_notes_location = "notes_subdir",
