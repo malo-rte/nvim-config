@@ -15,6 +15,25 @@ return {
 		wrap = false,
 	},
 
+	-- Load-triggering keys so the toggles work from a cold start (ft="qf"
+	-- alone can't open the quickfix, since it only loads once qf exists).
+	keys = {
+		{
+			"<leader>xq",
+			function()
+				require("quicker").toggle()
+			end,
+			desc = "Toggle quickfix",
+		},
+		{
+			"<leader>xl",
+			function()
+				require("quicker").toggle({ loclist = true })
+			end,
+			desc = "Toggle loclist",
+		},
+	},
+
 	config = function(_, opts)
 		require("quicker").setup({
 			opts = opts,
@@ -98,12 +117,5 @@ return {
 			end,
 		})
 
-		vim.keymap.set("n", "<leader>tq", function()
-			require("quicker").toggle()
-		end, { desc = "Toggle Quckfix" })
-
-		vim.keymap.set("n", "<leader>tl", function()
-			require("quicker").toggle({ loclist = true })
-		end, { desc = "Toggle Loclist" })
 	end,
 }

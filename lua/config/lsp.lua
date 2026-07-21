@@ -38,9 +38,9 @@ vim.api.nvim_create_autocmd("LspAttach", {
 		map("gD", vim.lsp.buf.declaration, "Go to declaration")
 		map("gi", vim.lsp.buf.implementation, "Go to implementation")
 		map("K", vim.lsp.buf.hover, "Hover docs")
-		map("<leader>rn", vim.lsp.buf.rename, "Rename")
+		map("<leader>cr", vim.lsp.buf.rename, "Rename")
 		map("<leader>ca", vim.lsp.buf.code_action, "Code action")
-		map("<leader>cti", toggle_inlay_hints, "Toggle inlay hints")
+		map("<leader>uh", toggle_inlay_hints, "Toggle inlay hints")
 
 		-- Telescope-powered LSP views (diagnostics list is a global map in
 		-- keymaps.lua so it also works in non-LSP buffers)

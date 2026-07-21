@@ -74,7 +74,7 @@ return {
 			end)
 		end
 
-		vim.keymap.set("n", "<leader>bb", ":Telescope buffers theme=ivy<cr>")
+		vim.keymap.set("n", "<leader>fb", ":Telescope buffers theme=ivy<cr>", { desc = "Find buffers" })
 
 		vim.keymap.set("n", "<leader>fr", function()
 			local project = require("config.project")
