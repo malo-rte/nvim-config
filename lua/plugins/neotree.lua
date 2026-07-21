@@ -106,7 +106,8 @@ return {
 				vim.cmd(cmd)
 			end, { desc = "Explorer: at project root" })
 
-            vim.keymap.set("n", "<leader>gS", ":Neotree git_status<CR>"
+			-- Open the git_status source (per-file stage/unstage/revert: gr etc.)
+			vim.keymap.set("n", "<leader>gS", "<cmd>Neotree git_status<CR>", { desc = "Git: status tree (neo-tree)" })
 		end,
 	},
 
