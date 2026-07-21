@@ -14,7 +14,7 @@
 --           :RebaseSkip :RebaseStatus
 
 local M = {}
-local uv = vim.uv or vim.loop
+local uv = vim.uv
 
 ----------------------------------------------------------------------
 -- git helpers

@@ -7,7 +7,7 @@
 -- current project's vault (see lua/plugins/obsidian.lua).
 
 local M = {}
-local uv = vim.uv or vim.loop
+local uv = vim.uv
 local project = require("config.project")
 
 local VAULT = ".vault"

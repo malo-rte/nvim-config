@@ -17,7 +17,7 @@ return {
 
 		-- per-project shada
 		vim.o.shadafile = proj_cache .. "/shada"
-		if (vim.uv or vim.loop).fs_stat(vim.o.shadafile) then
+		if vim.uv.fs_stat(vim.o.shadafile) then
 			pcall(vim.cmd, "silent! rshada")
 		end
 

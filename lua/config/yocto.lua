@@ -20,7 +20,7 @@
 --   yg grep · ya bbappend->recipe · yi info
 
 local M = {}
-local uv = vim.uv or vim.loop
+local uv = vim.uv
 
 local config = {
 	-- Extra dir names (besides build/builds/bitbake-builds) to look in.

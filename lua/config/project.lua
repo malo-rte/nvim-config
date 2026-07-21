@@ -1,13 +1,13 @@
 -- config/project.lua
 local M = {}
 
--- Prefer vim.uv on newer Neovim, fall back to vim.loop
+-- luv bindings (event loop + filesystem)
 ---@diagnostic disable: undefined-field
-local uv_cwd = (vim.uv or vim.loop).cwd
-local uv_os_homedir = (vim.uv or vim.loop).os_homedir
-local uv_fs_stat = (vim.uv or vim.loop).fs_stat
-local uv_fs_scandir = (vim.uv or vim.loop).fs_scandir
-local uv_fs_scandir_next = (vim.uv or vim.loop).fs_scandir_next
+local uv_cwd = vim.uv.cwd
+local uv_os_homedir = vim.uv.os_homedir
+local uv_fs_stat = vim.uv.fs_stat
+local uv_fs_scandir = vim.uv.fs_scandir
+local uv_fs_scandir_next = vim.uv.fs_scandir_next
 ---@diagnostic enable: undefined-field
 
 local root_cache = {}

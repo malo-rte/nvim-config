@@ -1,6 +1,6 @@
 local M = {}
-local uv = vim.uv or vim.loop
-local islist = vim.islist or vim.tbl_islist
+local uv = vim.uv
+local islist = vim.islist
 
 local DATA_DIR = vim.fn.stdpath("data") .. "/nerdfont"
 local MAP_PATH = DATA_DIR .. "/glyphnames.json"

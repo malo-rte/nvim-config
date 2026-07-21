@@ -23,7 +23,7 @@ local opts = {
 			-- project root (from your config.project) + short filename
 			function()
 				local ok, project = pcall(require, "config.project")
-                local root = (ok and project.project_root()) or (vim.uv or vim.loop).cwd()
+                local root = (ok and project.project_root()) or vim.uv.cwd()
 				return " " .. vim.fn.fnamemodify(root, ":~")
 			end,
 			{ "filename", path = 1, newfile_status = true, symbols = { modified = " " .. icons.file.modified, readonly = icons.file.readonly .. " " } },
