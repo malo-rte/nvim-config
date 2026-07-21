@@ -107,8 +107,9 @@ M.lsp_kind = {
 }
 
 -- Autoformat (format-on-save) status indicator -- editor-local. Shown in
--- the statusline: on = nf-md-auto_fix (U+F0068), off = nf-md-cancel /
--- slashed (U+F073A), so the state reads without relying on colour.
-M.autoformat = { on = "󰁨", off = "󰜺" }
+-- the statusline: on = nf-fa-magic (U+F0D0), off = nf-fa-ban /
+-- slashed (U+F05E). BMP-PUA glyphs (not Plane-15 md-*), so they render
+-- in any Nerd Font. State also reads without relying on colour.
+M.autoformat = { on = "", off = "" }
 
 return M
