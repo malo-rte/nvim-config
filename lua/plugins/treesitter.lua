@@ -40,6 +40,7 @@ local langs = {
 	"matlab",
 	"meson",
 	"nasm",
+	"nix",
 	"objdump",
 	"perl",
 	"promql",
