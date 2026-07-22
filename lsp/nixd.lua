@@ -6,11 +6,14 @@
 --- home-manager options and nixpkgs attrs), diagnostics, and formatting.
 --- Provide it via nix on NixOS; mason installs it in the dev container.
 ---
---- Formatting is delegated to nixfmt (also wired into conform.nvim). Option
---- completion needs an expression pointing at your own flake -- see the
---- commented examples below.
+--- Option completion targets your flake. The hostname and username are read at
+--- runtime (this runs on the actual host), so nvim on any machine targets that
+--- machine's nixosConfigurations.<host> automatically -- no per-host editing.
 
----@type vim.lsp.Config
+local FLAKE = "/home/cfg/nixos-cfg"
+local host = vim.uv.os_gethostname()
+local user = vim.env.USER or (vim.uv.os_get_passwd() or {}).username or ""
+
 return {
 	cmd = { "nixd" },
 	filetypes = { "nix" },
@@ -19,13 +22,18 @@ return {
 		nixd = {
 			formatting = { command = { "nixfmt" } },
 			nixpkgs = { expr = "import <nixpkgs> { }" },
-			-- Option completion: fill in your flake path + host/user, e.g.
-			-- nixos = {
-			--   expr = 'import (builtins.getFlake "/home/malo/nixcfg").nixosConfigurations.HOSTNAME.options',
-			-- },
-			-- home_manager = {
-			--   expr = '(builtins.getFlake "/home/malo/nixcfg").homeConfigurations."malo".options',
-			-- },
+			options = {
+				-- NixOS options for this host.
+				nixos = {
+					expr = ('(builtins.getFlake "%s").nixosConfigurations."%s".options'):format(FLAKE, host),
+				},
+				-- Standalone home-manager, config named after the user. If your HM
+				-- config uses a different name (e.g. "user@host") or is a NixOS
+				-- module, adjust this expr -- nixd just skips it if it fails to eval.
+				["home-manager"] = {
+					expr = ('(builtins.getFlake "%s").homeConfigurations."%s".options'):format(FLAKE, user),
+				},
+			},
 		},
 	},
 }
