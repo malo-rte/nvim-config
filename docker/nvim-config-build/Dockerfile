@@ -1,16 +1,11 @@
-# Complete build environment for the dev-tools workspace.
+# Base build environment for this Neovim config's dev container.
 #
-# Owns everything required to:
-#   - build every workspace crate         (Rust + Wayland/PCSC dev headers)
-#   - produce documentation               (AsciiDoc + PlantUML + PDF)
-#   - run the project's tooling           (docs-librarian, tasklist -- Python + PyYAML)
-#   - run the test suite                  (wfm shells out to these for previews:
-#                                          bsdtar, dtc, poppler-utils, ffmpeg)
-#
-# A CI runner using this image alone can `cargo build --workspace` and
-# `make html pdf` reproducibly. Developer ergonomics (shell tools, editor,
-# Claude Code, gpg, ssh, smartcard runtime, ...) live in dev-tools-dev,
-# which FROMs this image.
+# Owns the toolchains the config's tooling needs to build things locally:
+# compilers and dev headers for treesitter parsers and native plugin bits,
+# Rust, and Python. Developer ergonomics (shell tools, Neovim itself, Claude
+# Code, gpg, ssh, smartcard runtime, ghcup, ...) live in nvim-config-dev,
+# which FROMs this image -- and which docker/enter-dev-container.sh builds
+# immediately after this one, tagging both by those names.
 
 FROM debian:13
 

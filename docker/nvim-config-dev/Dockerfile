@@ -1,4 +1,4 @@
-# Developer convenience layer on top of dev-tools-build.
+# Developer convenience layer on top of nvim-config-build.
 #
 # Adds what makes interactive work pleasant but is not required to build:
 #   - shell tools (less, nvim, tmux, starship, direnv, kitty-terminfo)
@@ -10,9 +10,9 @@
 #   - Haskell toolchain via ghcup (ghc, cabal, haskell-language-server)
 #
 # Anything actually needed to compile workspace crates or render the
-# docs already lives in dev-tools-build.
+# docs already lives in nvim-config-build.
 
-FROM dev-tools-build:latest
+FROM nvim-config-build:latest
 ARG USER_NAME=dev
 USER root
 
@@ -68,7 +68,7 @@ RUN set -eux; \
 # require("nvim-treesitter").install(langs); without the CLI every parser
 # build fails with ENOENT: 'tree-sitter'. Use the upstream prebuilt binary --
 # `cargo install tree-sitter-cli` would pull in bindgen and need libclang,
-# which the image doesn't have. build-essential (gcc) from dev-tools-build
+# which the image doesn't have. build-essential (gcc) from nvim-config-build
 # still does the actual parser compile. NixOS gets parsers from nix instead,
 # so this isn't needed there.
 ARG TREE_SITTER_VERSION=v0.26.11
@@ -106,11 +106,11 @@ RUN curl -fsSL https://claude.ai/install.sh | bash
 # age-plugin-yubikey: runtime tool that mpass shells out to at
 # decrypt time for YubiKey-backed identities (ADR 0003 + the M3
 # subsection in decisions/). The build deps (Rust toolchain,
-# libpcsclite-dev, libusb-1.0-0-dev) come from dev-tools-build.
+# libpcsclite-dev, libusb-1.0-0-dev) come from nvim-config-build.
 RUN cargo install --locked age-plugin-yubikey
 
 # kdlfmt: the KDL formatter conform.nvim runs on save (lua/plugins/conform.lua).
-# Rust tool; the toolchain comes from dev-tools-build. NixOS provides it via nix.
+# Rust tool; the toolchain comes from nvim-config-build. NixOS provides it via nix.
 RUN cargo install --locked kdlfmt
 
 # kdl-lsp: the KDL language server (lsp/kdl.lua). Diagnostics only for now.
@@ -121,7 +121,7 @@ RUN cargo install --locked kdl-lsp
 # lsp/hls.lua's haskell-language-server-wrapper can actually start. Large
 # layer (GHC + HLS are multi-GB). The GHC bindist's link/runtime libs
 # (libgmp, libffi, ncurses/libtinfo, zlib, libnuma) come from DEV_PACKAGES;
-# build-essential is inherited from dev-tools-build. NixOS provides this
+# build-essential is inherited from nvim-config-build. NixOS provides this
 # toolchain via nix instead, so it's container-only. GHC_VERSION accepts a
 # version, "recommended", or "latest"; bump/pin it as needed.
 ARG GHC_VERSION=recommended
