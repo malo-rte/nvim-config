@@ -32,6 +32,24 @@ return {
 			end,
 			desc = "Toggle loclist",
 		},
+		{
+			-- nvim-hlslens already knows where every match of the current
+			-- search is; this hands that list to the quickfix, so search
+			-- results become something you step through with ]q / [q and can
+			-- edit in place. exportLastSearchToQuickfix returns false when no
+			-- search lens is active -- say so rather than opening an empty
+			-- list. The search highlight is cleared once it is in the list.
+			"<leader>xs",
+			function()
+				local ok, hlslens = pcall(require, "hlslens")
+				if not ok or not hlslens.exportLastSearchToQuickfix() then
+					return vim.notify("No active search to export", vim.log.levels.WARN)
+				end
+				vim.cmd("nohlsearch")
+				require("quicker").open({ focus = true })
+			end,
+			desc = "Search matches -> quickfix",
+		},
 	},
 
 	config = function(_, opts)

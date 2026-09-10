@@ -17,6 +17,10 @@
 --   * / #     search the word under the cursor forward / backward
 --   g* / g#   the same without word boundaries
 -- Commands: :HlSearchLensToggle :HlSearchLensEnable :HlSearchLensDisable
+--
+-- <leader>xs sends the current search's matches to the quickfix list and opens
+-- it with quicker.nvim. That binding lives in plugins/quicker.lua, with the
+-- rest of the <leader>x quickfix keys.
 return {
 	"kevinhwang91/nvim-hlslens",
 	event = "VeryLazy",

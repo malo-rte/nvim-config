@@ -99,6 +99,7 @@ use `<M-n>` to reach normal mode for scrolling and copying.
 | `<leader>xX` | Diagnostics: current buffer |
 | `<leader>xq` | Toggle quickfix |
 | `<leader>xl` | Toggle loclist |
+| `<leader>xs` | Send the current search's matches to the quickfix list |
 | `[q` / `]q` | Previous / next quickfix item (`[Q` / `]Q` first/last) |
 | `[l` / `]l` | Previous / next loclist item |
 
@@ -215,6 +216,12 @@ match with its position — `[1/4]` on the nearest one, `[2n 3]` on a match two
 the keys above; `<Esc>` (`:nohlsearch`) clears it. `:HlSearchLensToggle`
 turns the annotations off without disabling search highlighting.
 
+`<leader>xs` hands those same matches to the quickfix list and opens it with
+[quicker.nvim](https://github.com/stevearc/quicker.nvim), so a search becomes
+something you step through with `]q` / `[q` and can edit in place. It clears
+the search highlight on the way, and says so rather than opening an empty list
+if no search is active.
+
 ### Spelling
 
 `spelllang` is English + Swedish, but only languages whose spell file is
@@ -225,6 +232,7 @@ every buffer. `:SpellInstall [lang]` adds a missing one back and fetches it.
 
 | Key | Action |
 |---|---|
+| `<Space>` | Leader — does nothing on its own |
 | `n` / `N` | Next / previous search result, centered |
 | `*` / `#` | Search the word under the cursor forward / backward |
 | `g*` / `g#` | The same, without word boundaries |
