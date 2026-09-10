@@ -6,8 +6,46 @@ vim.opt.scrolloff = 10 -- Keep 10 line above / below cursor
 vim.opt.sidescrolloff = 8 -- Keep 8 columns left/right of cursor
 vim.opt.wrap = false -- Don't wrap lines
 vim.opt.cmdheight = 1 -- Command line height
-vim.opt.spelllang = { "en", "sv" } -- Set language for spellchecking
+-- Spell: English + Swedish. Neovim's spellfile plugin prompts "No spell file
+-- found for sv (utf-8). Download? [y/N]" once per buffer when a language's .spl
+-- is missing, which stalls startup on a fresh machine or container. Keep only
+-- the languages that can actually load and say once what was dropped;
+-- :SpellInstall puts one back and triggers the download on demand.
+local function spell_available(lang)
+	return #vim.api.nvim_get_runtime_file("spell/" .. lang .. ".*.spl", false) > 0
+end
+
+local spell_wanted = { "en", "sv" }
+local spell_usable, spell_missing = {}, {}
+for _, lang in ipairs(spell_wanted) do
+	table.insert(spell_available(lang) and spell_usable or spell_missing, lang)
+end
+
+vim.opt.spelllang = #spell_usable > 0 and spell_usable or { "en" }
 vim.opt.spell = true
+
+if #spell_missing > 0 then
+	vim.schedule(function()
+		vim.notify(
+			("spell: no spell file for %s, dropped from 'spelllang' (:SpellInstall %s to fetch it)"):format(
+				table.concat(spell_missing, ", "),
+				spell_missing[1]
+			),
+			vim.log.levels.WARN
+		)
+	end)
+end
+
+vim.api.nvim_create_user_command("SpellInstall", function(o)
+	local lang = o.args ~= "" and o.args or spell_missing[1]
+	if not lang then
+		return vim.notify("SpellInstall: every wanted language is already loaded")
+	end
+	vim.opt.spelllang:append(lang)
+	-- Re-setting 'spelllang' is what makes Neovim try to load the file, which
+	-- is what fires spellfile.vim's SpellFileMissing download prompt.
+	vim.cmd("set spelllang=" .. table.concat(vim.opt.spelllang:get(), ","))
+end, { nargs = "?", desc = "Add a language to 'spelllang' and fetch its spell file" })
 
 -- Tabbing / Indentation
 vim.opt.tabstop = 4
