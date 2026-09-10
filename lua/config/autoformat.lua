@@ -44,22 +44,42 @@ local function save()
 	end
 end
 
+-- Marker reads sit on the statusline's hot path: lualine asks enabled() on
+-- every redraw (twice -- once for the glyph, once for its colour), and each
+-- call used to io.open the marker. Cache per root, in a wrapper table so
+-- "absent" caches as distinctly as "present". Writing a .autoformat drops it.
+local marker_cache = {}
+
 -- committed marker: nil (absent), true (present/on), false (content says off)
 local function read_marker(root)
 	if not root then
 		return nil
 	end
+	local hit = marker_cache[root]
+	if hit then
+		return hit.value
+	end
+
+	local value
 	local f = io.open(vim.fs.joinpath(root, MARKER), "r")
-	if not f then
-		return nil
+	if f then
+		local v = (f:read("*a") or ""):gsub("%s+", ""):lower()
+		f:close()
+		value = not (v == "off" or v == "false" or v == "no" or v == "0")
 	end
-	local v = (f:read("*a") or ""):gsub("%s+", ""):lower()
-	f:close()
-	if v == "off" or v == "false" or v == "no" or v == "0" then
-		return false
-	end
-	return true
+
+	marker_cache[root] = { value = value }
+	return value
 end
+
+vim.api.nvim_create_autocmd("BufWritePost", {
+	group = vim.api.nvim_create_augroup("AutoformatMarker", { clear = true }),
+	pattern = MARKER,
+	desc = "Re-read .autoformat markers after one is edited",
+	callback = function()
+		marker_cache = {}
+	end,
+})
 
 local function bpath(bufnr)
 	local n = vim.api.nvim_buf_get_name(bufnr or 0)
