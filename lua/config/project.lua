@@ -87,12 +87,18 @@ function M.project_root(opts)
 		path = vim.fn.fnamemodify(cwd, ":p")
 	end
 
-	if not opts.no_cache and root_cache[path] then
-		return root_cache[path]
+	-- The answer depends on the cwd as well as the path (the anchoring above),
+	-- so both belong in the key. Caching by path alone needed a full wipe on
+	-- every BufEnter, which meant a synchronous `git rev-parse` per buffer
+	-- switch -- on the UI thread, since the statusline asks for the root on
+	-- redraw. Call M.clear_root_cache() if a repo appears mid-session.
+	local key = cwd .. "\0" .. path
+	if not opts.no_cache and root_cache[key] then
+		return root_cache[key]
 	end
 	local root = compute_root(path)
 	if not opts.no_cache then
-		root_cache[path] = root
+		root_cache[key] = root
 	end
 	return root
 end
@@ -100,12 +106,6 @@ end
 function M.clear_root_cache()
 	root_cache = {}
 end
-
-vim.api.nvim_create_autocmd({ "BufEnter", "DirChanged" }, {
-	callback = function()
-		M.clear_root_cache()
-	end,
-})
 
 function M.find_projects(root, opts)
 	opts = opts or {}
