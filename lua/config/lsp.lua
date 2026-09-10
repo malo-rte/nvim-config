@@ -71,13 +71,10 @@ vim.api.nvim_create_autocmd("LspAttach", {
 	end,
 })
 
-local ok, blink = pcall(require, "blink.cmp")
-
-if ok then
-	vim.lsp.config("*", {
-		capabilities = blink.get_lsp_capabilities(),
-	})
-end
+-- No capabilities wiring here on purpose: blink.cmp's own plugin/blink-cmp.lua
+-- calls vim.lsp.config("*", { capabilities = ... }) and merges whatever we set,
+-- so requiring blink here only forced it to load eagerly (which silently killed
+-- its own lazy `event`). blink is a start plugin instead -- see plugins/blink.lua.
 
 -- Enable all LSPs that have a config file in *our* lsp/ dir. Scope to the
 -- config directory rather than the whole runtimepath, or plugins that ship

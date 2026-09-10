@@ -4,7 +4,11 @@ local icons = require("utils.icons")
 return {
 	"Saghen/blink.cmp",
 	version = "1.*",
-	event = { "InsertEnter", "CmdlineEnter" },
+	-- Not lazy: blink's plugin/blink-cmp.lua is what registers
+	-- vim.lsp.config("*", { capabilities = ... }), and capabilities are read when
+	-- a client *starts*. Deferring to InsertEnter would mean every server started
+	-- before the first insert runs without blink's completion capabilities.
+	lazy = false,
 	opts = {
 		appearance = {
 			nerd_font_variant = "mono",
