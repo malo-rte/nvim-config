@@ -26,14 +26,26 @@ out blank/invisible.
 
 ## Testing the config (headless)
 
-The repo is **not** at `~/.config/nvim` here — it's `/workspaces/nvim-config`,
-so plain `nvim` won't load it. To boot the real config headless:
+The repo is **not** at `~/.config/nvim` here — it's the container's workspace
+mount, `/workspaces/<repo dir name>` (currently `/workspaces/nvim`, since
+`enter-dev-container.sh` derives it from the repo directory). Plain `nvim` won't
+load it. To boot the real config headless, against a **copy**, so nothing the
+boot writes lands in the repo:
 
 ```sh
-tmp=$(mktemp -d); ln -s /workspaces/nvim-config "$tmp/nvim"
-XDG_CONFIG_HOME="$tmp" nvim --headless "+lua vim.defer_fn(function() ... vim.cmd('qa!') end, 6000)"
+tmp=$(mktemp -d); mkdir -p "$tmp/cfg/nvim"
+tar -C /workspaces/nvim --exclude=.git -cf - . | tar -C "$tmp/cfg/nvim" -xf -
+XDG_CONFIG_HOME="$tmp/cfg" XDG_DATA_HOME="$tmp/data" XDG_STATE_HOME="$tmp/state" \
+  nvim --headless "+lua vim.defer_fn(function() vim.cmd('qa!') end, 6000)"
 ```
 
+- **Boot against a copy, not a symlink to the repo.** lazy.nvim writes
+  `lazy-lock.json` into `stdpath('config')`, so a symlinked boot rewrites the
+  committed lockfile — and if `$NVIM_TS_PARSERS` is set for the test, `mason.lua`
+  returns `{}` and the boot *deletes* the mason entries from it.
+- Setting `$NVIM_TS_PARSERS` to a throwaway dir is the way to skip compiling ~50
+  treesitter parsers in a smoke test — but it puts the config on its **NixOS**
+  path (`env.is_nix`), so mason is skipped and the portable branch goes untested.
 - Parse check a file: `nvim --headless -u NONE -c "lua assert(loadfile('f.lua'))" -c qa`.
 - A modified **listed** buffer + `qa` (no `!`) **hangs** headless on the
   unsaved-changes prompt — always `qa!`, and use unlisted scratch buffers.
@@ -61,6 +73,19 @@ XDG_CONFIG_HOME="$tmp" nvim --headless "+lua vim.defer_fn(function() ... vim.cmd
   check) — when testing, set the shell cwd to the temp project.
 - **conform** silently skips a formatter whose binary isn't installed, so adding
   a `formatters_by_ft` mapping is safe even before the tool exists.
+- **blink.cmp must be a start plugin.** Its `plugin/blink-cmp.lua` is what
+  registers `vim.lsp.config('*', { capabilities = ... })`, and capabilities are
+  read when a client *starts* — servers start on `FileType`, long before any
+  `InsertEnter`. Deferring it silently costs every server its completion
+  capabilities.
+- **Telescope is lazy**, so anything that needs it must `require` it *inside* a
+  function, never at file scope (that was what kept pulling it into startup via
+  `utils.nerdfontpicker` and `config.lsp`). `vim.ui.select` is kept routed
+  through it by a shim in the spec's `init` that loads it on first use.
+- **`:checktime` inside an autocmd will not reload the buffer that autocmd is
+  firing for.** Testing the reload handler with
+  `nvim_exec_autocmds('BufEnter', { buffer = cur })` therefore always looks
+  broken; switch buffers for real (`:buffer #`) to see it work.
 - Uses `vim.uv` / `vim.islist` directly (no `vim.loop` / `vim.tbl_islist`
   fallbacks) — targeting 0.12; lua_ls flags the deprecated names.
 
@@ -74,7 +99,9 @@ XDG_CONFIG_HOME="$tmp" nvim --headless "+lua vim.defer_fn(function() ... vim.cmd
 
 - **No Docker daemon inside this container** — can't run `docker build`;
   Dockerfile changes are verified only to the crate/asset level, not a real build.
-- **Pre-existing `FROM` mismatch**: `nvim-config-dev/Dockerfile` FROMs
-  `dev-tools-build:latest`, but `enter-dev-container.sh` builds/tags
-  `nvim-config-build`. A from-scratch build won't succeed until reconciled (or a
-  `dev-tools-build:latest` image already exists).
+- The image chain is `nvim-config-build` (base toolchains, `FROM debian:13`) →
+  `nvim-config-dev` (shell tools, Neovim, Claude Code, ghcup, smartcard runtime).
+  `enter-dev-container.sh` builds both in that order and tags them by those
+  names. Keep the `FROM` in `nvim-config-dev/Dockerfile` matching that tag — it
+  previously pointed at `dev-tools-build:latest`, an image nothing here builds,
+  so a from-scratch build could only work by accident.
