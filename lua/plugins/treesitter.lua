@@ -52,6 +52,22 @@ local langs = {
 	"terraform",
 }
 
+-- Filetypes that keep Neovim's own indent expression. The main branch's
+-- indentexpr is experimental, and for these Neovim already ships an indent
+-- that is as good or better -- lua and python are the ones that visibly
+-- misbehave under treesitter indent, and c/cpp have 'cindent' behind them.
+-- Everything else with a parser gets treesitter indent as before.
+local NATIVE_INDENT = {
+	c = true,
+	cpp = true,
+	lua = true,
+	python = true,
+	sh = true,
+	bash = true,
+	vim = true,
+	make = true,
+}
+
 return {
 	{
 		"nvim-treesitter/nvim-treesitter",
@@ -85,8 +101,9 @@ return {
 					local lang = vim.treesitter.language.get_lang(ft)
 					if lang and vim.treesitter.language.add(lang) then
 						pcall(vim.treesitter.start, ev.buf, lang)
-						-- treesitter-based indent (optional)
-						vim.bo[ev.buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+						if not NATIVE_INDENT[ft] then
+							vim.bo[ev.buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+						end
 					end
 				end,
 			})
