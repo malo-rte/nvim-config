@@ -25,6 +25,8 @@ vim.api.nvim_create_autocmd("FileType", {
 
 -- Make window separators brighter
 vim.api.nvim_create_autocmd("ColorScheme", {
+	group = vim.api.nvim_create_augroup("WindowSeparators", { clear = true }),
+	desc = "Keep window separators bright across colorscheme switches",
 	callback = function()
 		vim.api.nvim_set_hl(0, "VertSplit", { link = "Normal" })
 		vim.api.nvim_set_hl(0, "WinSeparator", { link = "Normal" })

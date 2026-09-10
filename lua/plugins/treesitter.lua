@@ -78,6 +78,8 @@ return {
 
 			-- main branch does NOT auto-start highlighting; do it per-filetype
 			vim.api.nvim_create_autocmd("FileType", {
+				group = vim.api.nvim_create_augroup("TreesitterStart", { clear = true }),
+				desc = "Start treesitter highlighting for filetypes with a parser",
 				callback = function(ev)
 					local ft = vim.bo[ev.buf].filetype
 					local lang = vim.treesitter.language.get_lang(ft)

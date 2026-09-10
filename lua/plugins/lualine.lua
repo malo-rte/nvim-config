@@ -114,6 +114,7 @@ return {
 
 		-- keep the REC indicator live
 		vim.api.nvim_create_autocmd({ "RecordingEnter", "RecordingLeave" }, {
+			group = vim.api.nvim_create_augroup("LualineRecording", { clear = true }),
 			callback = function()
 				vim.defer_fn(function()
 					ll.refresh({ place = { "statusline" } })

@@ -38,17 +38,18 @@ return {
 		o.draw.animation = M.gen_animation.none()
 		M.setup(o)
 
+		local grp = vim.api.nvim_create_augroup("MiniIndentscope", { clear = true })
+
 		-- Dim, theme-aware guide color
 		local function dim()
 			--local fg = (vim.o.background == "dark") and "#3a3a3a" or "#b0b0b0"
 			--vim.api.nvim_set_hl(0, "MiniIndentscopeSymbol", { fg = fg, nocombine = true })
 			vim.api.nvim_set_hl(0, "MiniIndentscopeSymbol", { link = "NonText" }) -- or "Conceal"
 		end
-		vim.api.nvim_create_autocmd("ColorScheme", { callback = dim })
+		vim.api.nvim_create_autocmd("ColorScheme", { group = grp, callback = dim })
 		dim()
 
 		-- Optional: disable in sidebars/special buffers
-		local grp = vim.api.nvim_create_augroup("MiniIndentscopeDisable", { clear = true })
 		vim.api.nvim_create_autocmd("FileType", {
 			group = grp,
 			pattern = {

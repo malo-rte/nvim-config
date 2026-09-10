@@ -629,7 +629,11 @@ ucmd("YoctoRefresh", function()
 	vim.notify("yocto: caches cleared")
 end, {})
 
+local yocto_group = vim.api.nvim_create_augroup("Yocto", { clear = true })
+
 vim.api.nvim_create_autocmd("DirChanged", {
+	group = yocto_group,
+	desc = "Drop the resolved-layer cache when the cwd moves",
 	callback = function()
 		cache = { ws = nil, layer_dirs = nil, resolved_key = nil, resolved = nil }
 	end,
@@ -649,6 +653,8 @@ map("n", "<leader>yj", M.goto_def, { desc = "Yocto: goto inherit/require under c
 
 -- BitBake-aware `gf` in recipe buffers.
 vim.api.nvim_create_autocmd("FileType", {
+	group = yocto_group,
+	desc = "BitBake-aware gf in recipe buffers",
 	pattern = "bitbake",
 	callback = function(ev)
 		vim.keymap.set("n", "gf", M.goto_def, {
