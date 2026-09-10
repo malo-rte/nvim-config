@@ -51,6 +51,61 @@ end
 return {
 	"nvim-telescope/telescope.nvim",
 	version = "*",
+
+	-- Lazy: the pickers below are the only entry points, plus the commands and
+	-- the vim.ui.select shim in `init`. Everything else that wants Telescope
+	-- (config.project, config.yocto, utils.nerdfontpicker, the grr LSP map)
+	-- requires it from inside a function, which pulls it in on demand.
+	cmd = { "Telescope", "ProjectPick", "ProjectFiles", "ProjectGrep" },
+	keys = {
+		{ "<leader>fb", "<cmd>Telescope buffers theme=ivy<cr>", desc = "Find buffers" },
+		{
+			"<leader>ff",
+			function()
+				require("telescope.builtin").find_files(with_ivy({ cwd = require("config.project").project_root() }))
+			end,
+			desc = "Find files (project root)",
+		},
+		{
+			"<leader>fg",
+			function()
+				require("telescope.builtin").live_grep(with_ivy({ cwd = require("config.project").project_root() }))
+			end,
+			desc = "live grep (project root)",
+		},
+		{
+			"<leader>fr",
+			function()
+				local dir = require("config.project").project_root()
+				-- choose your scope: tcd (tab), lcd (window), or chdir (global)
+				pcall(vim.cmd.tcd, vim.fn.fnameescape(dir))
+				require("telescope").extensions.frecency.frecency(with_ivy({ workspace = "CWD" }))
+			end,
+			desc = "Frecency (project)",
+		},
+		{
+			"<leader>fp",
+			function()
+				require("config.project").project_picker("~", {
+					scan = { max_depth = 16, prune_on_match = true },
+					scope = "tab", --  or 'global' / 'window'
+					open = "find_files", -- or 'live_grep'
+				})
+			end,
+			desc = "Find & switch project",
+		},
+	},
+
+	init = function()
+		-- Keep vim.ui.select (LSP code actions, ...) routed through Telescope
+		-- without loading it at startup: the first call pulls Telescope in,
+		-- whose config installs the real ui-select handler, then re-dispatches.
+		vim.ui.select = function(...)
+			require("lazy").load({ plugins = { "telescope.nvim" } })
+			return vim.ui.select(...)
+		end
+	end,
+
 	dependencies = {
 		{ "nvim-lua/plenary.nvim" },
 		{ "nvim-telescope/telescope-fzf-native.nvim", build = "make", cond = vim.fn.executable("make") == 1 },
@@ -80,38 +135,6 @@ return {
 				vim.notify("telescope-fzf-native not loaded (optional)", vim.log.levels.WARN)
 			end)
 		end
-
-		vim.keymap.set("n", "<leader>fb", ":Telescope buffers theme=ivy<cr>", { desc = "Find buffers" })
-
-		vim.keymap.set("n", "<leader>fr", function()
-			local project = require("config.project")
-			local dir = project.project_root()
-			-- choose your scope: tcd (tab), lcd (window), or chdir (global)
-			pcall(vim.cmd.tcd, vim.fn.fnameescape(dir))
-			ts.extensions.frecency.frecency(with_ivy({ workspace = "CWD" }))
-		end, { desc = "Frecency (project)" })
-
-		-- Find files from your dynamic project root
-		vim.keymap.set("n", "<leader>ff", function()
-			tb.find_files(with_ivy({ cwd = project.project_root() }))
-		end, { desc = "Find files (project root)" })
-
-		-- Live grep from your dynamic project root
-		vim.keymap.set("n", "<leader>fg", function()
-			tb.live_grep(with_ivy({ cwd = project.project_root() }))
-		end, { desc = "live grep (project root)" })
-
-		-- Find a project in the home directory and select it
-		vim.keymap.set("n", "<leader>fp", function()
-			project.project_picker("~", {
-				scan = { max_depth = 16, prune_on_match = true },
-				scope = "tab", --  or 'global' / 'window'
-				open = "find_files", -- or 'live_grep'
-			})
-		end, { desc = "Find & switch project" })
-
-		vim.keymap.set("n", "<leader>inc", ":NerdFontPicker insert char<CR>", { desc = "Insert nerdfont char" })
-		vim.keymap.set("n", "<leader>inn", ":NerdFontPicker insert name<CR>", { desc = "Insert nerdfont glyph name" })
 
 		-- Create commands
 		vim.api.nvim_create_user_command("ProjectPick", function(opts)

@@ -1,8 +1,6 @@
-local pickers = require("telescope.pickers")
-local finders = require("telescope.finders")
-local conf = require("telescope.config").values
-local actions = require("telescope.actions")
-local action_state = require("telescope.actions.state")
+-- Telescope is required inside the picker, not at module scope: init.lua pulls
+-- this file in at startup purely to register :NerdFontPicker, and a top-level
+-- require would drag all of Telescope in with it.
 
 -- Glyph parsing lives in utils.nerdfont (single source of truth for
 -- glyphnames.json). list_all() returns { name, char, code, display };
@@ -25,6 +23,12 @@ local function load_glyphs()
 end
 
 local function nerd_font_picker(action, field)
+	local pickers = require("telescope.pickers")
+	local finders = require("telescope.finders")
+	local conf = require("telescope.config").values
+	local actions = require("telescope.actions")
+	local action_state = require("telescope.actions.state")
+
 	local items = load_glyphs()
 	pickers
 		.new({}, {
@@ -84,3 +88,6 @@ end, {
 	end,
 	desc = "Pick a Nerd Font glyph and yank or insert it",
 })
+
+vim.keymap.set("n", "<leader>inc", "<cmd>NerdFontPicker insert char<cr>", { desc = "Insert nerdfont char" })
+vim.keymap.set("n", "<leader>inn", "<cmd>NerdFontPicker insert name<cr>", { desc = "Insert nerdfont glyph name" })

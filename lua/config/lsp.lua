@@ -12,8 +12,6 @@ vim.api.nvim_create_autocmd("LspAttach", {
 			vim.lsp.document_color.enable(true, { bufnr = ev.buf })
 		end
 
-		local tsb = require("telescope.builtin")
-
 		local function map(keys, func, desc)
 			vim.keymap.set("n", keys, func, {
 				buffer = ev.buf,
@@ -44,7 +42,9 @@ vim.api.nvim_create_autocmd("LspAttach", {
 
 		-- Telescope-powered LSP views (diagnostics list is a global map in
 		-- keymaps.lua so it also works in non-LSP buffers)
-		map("grr", tsb.lsp_references, "References (Telescope)")
+		map("grr", function()
+			require("telescope.builtin").lsp_references()
+		end, "References (Telescope)")
 
 		-- Diagnostics navigation
 		map("[d", function()
