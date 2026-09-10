@@ -270,6 +270,7 @@ lua/config/           options, keymaps, lazy bootstrap, LSP, project, vault, yoc
 lua/plugins/          one file per plugin
 lua/utils/            icons (shared table), diagnostics, nerd-font helpers
 lsp/                  one file per language server (driven by vim.lsp.enable)
-scripts/              gen_ftype_icons.py (generates the file-type icon map from the spec)
+scripts/              gen_ftype_icons.py (file-type icon map from the spec),
+                      audit_keymaps.py (every mapping is named in this README)
 docker/               dev container (Neovim 0.12, tree-sitter, ghcup, node)
 ```

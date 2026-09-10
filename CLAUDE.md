@@ -47,6 +47,13 @@ XDG_CONFIG_HOME="$tmp/cfg" XDG_DATA_HOME="$tmp/data" XDG_STATE_HOME="$tmp/state"
   treesitter parsers in a smoke test — but it puts the config on its **NixOS**
   path (`env.is_nix`), so mason is skipped and the portable branch goes untested.
 - Parse check a file: `nvim --headless -u NONE -c "lua assert(loadfile('f.lua'))" -c qa`.
+- **`python3 scripts/audit_keymaps.py`** checks every mapping the config defines
+  is named in README.md (exit 0 clean, 1 undocumented, 2 the audit itself
+  failed). Run it after adding or renaming a keymap. It reads lazy `keys` specs
+  from a headless Neovim's live plugin table, **not** by parsing the Lua --
+  a regex over `keys = {` blocks stops at the first nested entry and reports
+  "all documented" while silently missing keys, which is why the script has
+  canaries and refuses to print a result if they go missing.
 - A modified **listed** buffer + `qa` (no `!`) **hangs** headless on the
   unsaved-changes prompt — always `qa!`, and use unlisted scratch buffers.
 - `require('lualine').statusline()` renders the **inactive** line (no
