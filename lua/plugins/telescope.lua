@@ -43,6 +43,11 @@ local opts = {
 	},
 }
 
+-- Bounded so the <leader>fp scan of $HOME cannot wander: it walks
+-- synchronously, and prune_on_match stops at the first marker, but a directory
+-- with no marker anywhere below it would otherwise be walked to depth 16.
+local PROJECT_SCAN = { max_depth = 8, limit = 1000, prune_on_match = true }
+
 -- helper so we never mutate the base Ivy opts
 local function with_ivy(opts)
 	return vim.tbl_deep_extend("force", require("telescope.themes").get_ivy(), opts or {})
@@ -87,7 +92,7 @@ return {
 			"<leader>fp",
 			function()
 				require("config.project").project_picker("~", {
-					scan = { max_depth = 16, prune_on_match = true },
+					scan = PROJECT_SCAN,
 					scope = "tab", --  or 'global' / 'window'
 					open = "find_files", -- or 'live_grep'
 				})
@@ -139,7 +144,7 @@ return {
 		-- Create commands
 		vim.api.nvim_create_user_command("ProjectPick", function(opts)
 			project.project_picker(opts.args ~= "" and opts.args or "~", {
-				scan = { max_depth = 16, prune_on_match = true },
+				scan = PROJECT_SCAN,
 				scope = "tab", -- or 'global' / 'window'
 				open = "find_files", -- or 'live_grep'
 			})
