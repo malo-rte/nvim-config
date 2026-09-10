@@ -10,9 +10,7 @@ local CACHE_SIZE = 200
 -- (DEV-TOOLS-DES-0004 §91: code points must not shift silently between
 -- releases). Keep this in sync with utils.icons M.nerd_font.mapping_version.
 local MAPPING_VERSION = "v3.4.0"
-local REMOTE_URL = "https://raw.githubusercontent.com/ryanoasis/nerd-fonts/"
-	.. MAPPING_VERSION
-	.. "/glyphnames.json"
+local REMOTE_URL = "https://raw.githubusercontent.com/ryanoasis/nerd-fonts/" .. MAPPING_VERSION .. "/glyphnames.json"
 
 -- -------- Internal state -----------------------------------------------------------
 local map_loaded = false

@@ -348,7 +348,8 @@ function M.select_build(on_done)
 					if entry then
 						state.active, cache.resolved_key = entry.value, nil
 						vim.notify(
-							"yocto: active build " .. vim.fn.fnamemodify(vim.fs.dirname(vim.fs.dirname(entry.value)), ":~")
+							"yocto: active build "
+								.. vim.fn.fnamemodify(vim.fs.dirname(vim.fs.dirname(entry.value)), ":~")
 						)
 						if on_done then
 							on_done(entry.value)
@@ -589,7 +590,7 @@ function M.goto_def()
 		vim.notify("yocto: no layers (select a build or open within a workspace)", vim.log.levels.WARN)
 		return
 	end
-	vim.cmd("normal! m'")                       -- record origin for <C-o>
+	vim.cmd("normal! m'") -- record origin for <C-o>
 	local line = vim.api.nvim_get_current_line() -- <- this line must still be here
 	local req = line:match("^%s*require%s+(%S+)") or line:match("^%s*include%s+(%S+)")
 

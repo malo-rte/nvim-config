@@ -1,53 +1,53 @@
 local opts = {
-      -- Content management
-      content = {
-        -- Function which formats the notification message
-        -- By default prepends message with notification time
-        format = nil,
+	-- Content management
+	content = {
+		-- Function which formats the notification message
+		-- By default prepends message with notification time
+		format = nil,
 
-        -- Function which orders notification array from most to least important
-        -- By default orders first by level and then by update timestamp
-        sort = nil,
-      },
+		-- Function which orders notification array from most to least important
+		-- By default orders first by level and then by update timestamp
+		sort = nil,
+	},
 
-      -- Notifications about LSP progress
-      lsp_progress = {
-        -- Whether to enable showing
-        enable = true,
+	-- Notifications about LSP progress
+	lsp_progress = {
+		-- Whether to enable showing
+		enable = true,
 
-        -- Notification level
-        level = 'INFO',
+		-- Notification level
+		level = "INFO",
 
-        -- Duration (in ms) of how long last message should be shown
-        duration_last = 1000,
-      },
+		-- Duration (in ms) of how long last message should be shown
+		duration_last = 1000,
+	},
 
-      -- Window options
-      window = {
-        -- Floating window config
-        config = {},
+	-- Window options
+	window = {
+		-- Floating window config
+		config = {},
 
-        -- Maximum window width as share (between 0 and 1) of available columns
-        max_width_share = 0.382,
+		-- Maximum window width as share (between 0 and 1) of available columns
+		max_width_share = 0.382,
 
-        -- Value of 'winblend' option
-        winblend = 25,
-    },
+		-- Value of 'winblend' option
+		winblend = 25,
+	},
 }
 
 return {
-    'nvim-mini/mini.notify',
-    version = '*',
-    opts = opts,
+	"nvim-mini/mini.notify",
+	version = "*",
+	opts = opts,
 
-    config = function(_, o)
-        local plugin = require("mini.notify")
+	config = function(_, o)
+		local plugin = require("mini.notify")
 
-        plugin.setup(o)
+		plugin.setup(o)
 
-        -- Show the notification history (everything that flashed by).
-        vim.keymap.set("n", "<leader>un", function()
-            plugin.show_history()
-        end, { desc = "Notifications: history" })
-    end,
+		-- Show the notification history (everything that flashed by).
+		vim.keymap.set("n", "<leader>un", function()
+			plugin.show_history()
+		end, { desc = "Notifications: history" })
+	end,
 }

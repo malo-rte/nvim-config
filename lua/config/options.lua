@@ -70,7 +70,6 @@ end
 
 vim.opt.wildoptions = "pum"
 
-
 -- Behaviour settings
 vim.opt.errorbells = false -- Disable error sounds
 vim.opt.backspace = "indent,eol,start"

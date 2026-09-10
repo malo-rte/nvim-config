@@ -116,6 +116,5 @@ return {
 				return vim.o.columns - start_col
 			end,
 		})
-
 	end,
 }

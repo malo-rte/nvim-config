@@ -1,15 +1,15 @@
 local opts = {
-    silent = false,
+	silent = false,
 }
 
 return {
-    'nvim-mini/mini.bufremove',
-    version = '*',
-    opts = opts,
+	"nvim-mini/mini.bufremove",
+	version = "*",
+	opts = opts,
 
-    config = function(_, o)
-        local plugin = require("mini.bufremove")
+	config = function(_, o)
+		local plugin = require("mini.bufremove")
 
-        plugin.setup(o)
-    end,
+		plugin.setup(o)
+	end,
 }

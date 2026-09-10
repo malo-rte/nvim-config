@@ -1,4 +1,3 @@
-
 local langs = {
 	"c",
 	"bash",

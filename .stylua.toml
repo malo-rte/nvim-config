@@ -1,0 +1,16 @@
+# Formatting for this config's Lua. conform maps `lua` -> stylua and the
+# committed .autoformat marker turns format-on-save on for this repo, so
+# without a pinned config every machine formats to whatever stylua's defaults
+# happen to be that release -- and files drifted between tabs and spaces.
+#
+# These values are stylua's current defaults, written down on purpose: they
+# match the bulk of the tree, so pinning them makes the formatter a no-op on
+# already-formatted files instead of a moving target.
+column_width = 120
+line_endings = "Unix"
+indent_type = "Tabs"
+indent_width = 4
+quote_style = "AutoPreferDouble"
+call_parentheses = "Always"
+collapse_simple_statement = "Never"
+syntax = "LuaJIT"

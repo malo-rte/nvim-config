@@ -16,7 +16,10 @@ local opts = {
 		lualine_a = { "mode" },
 		lualine_b = {
 			{ "branch", icon = icons.git_repo.branch },
-			{ "diff", symbols = { added = git.added .. " ", modified = git.modified .. " ", removed = git.deleted .. " " } },
+			{
+				"diff",
+				symbols = { added = git.added .. " ", modified = git.modified .. " ", removed = git.deleted .. " " },
+			},
 		},
 
 		lualine_c = {
@@ -26,7 +29,12 @@ local opts = {
 				local root = (ok and project.project_root()) or vim.uv.cwd()
 				return " " .. vim.fn.fnamemodify(root, ":~")
 			end,
-			{ "filename", path = 1, newfile_status = true, symbols = { modified = " " .. icons.file.modified, readonly = icons.file.readonly .. " " } },
+			{
+				"filename",
+				path = 1,
+				newfile_status = true,
+				symbols = { modified = " " .. icons.file.modified, readonly = icons.file.readonly .. " " },
+			},
 		},
 
 		lualine_x = {
@@ -52,7 +60,12 @@ local opts = {
 				"diagnostics",
 				sources = { "nvim_diagnostic" },
 				sections = { "error", "warn", "info", "hint" },
-				symbols = { error = di.error .. " ", warn = di.warn .. " ", info = di.info .. " ", hint = di.hint .. " " },
+				symbols = {
+					error = di.error .. " ",
+					warn = di.warn .. " ",
+					info = di.info .. " ",
+					hint = di.hint .. " ",
+				},
 				update_in_insert = false,
 				always_visible = false,
 			},
