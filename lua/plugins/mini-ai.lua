@@ -15,7 +15,7 @@ local opts = {
 }
 
 return {
-	"echasnovski/mini.ai",
+	"nvim-mini/mini.ai",
 	version = "*", -- keep "*" if you prefer releases
 	opts = opts,
 	config = function(_, o)

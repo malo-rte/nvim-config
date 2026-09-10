@@ -1,6 +1,6 @@
 -- plugins/mini-sessions.lua
 return {
-	"echasnovski/mini.sessions",
+	"nvim-mini/mini.sessions",
 	lazy = false, -- load at startup so first launch can restore
 	version = false,
 	config = function()
