@@ -44,9 +44,17 @@ return {
 		ms.setup(opts)
 
 		local sess_name = "session.vim" -- an actual filename under proj_cache
+		local sess_path = proj_cache .. "/" .. sess_name
+
+		-- MiniSessions.read() reports "There are no detected sessions. Change
+		-- configuration and rerun MiniSessions.setup()." when the directory is
+		-- empty, which is just what a first launch in a new project looks like.
+		local function has_session()
+			return vim.uv.fs_stat(sess_path) ~= nil
+		end
 
 		-- restore on first launch (no file args) after startup settles
-		if vim.fn.argc() == 0 then
+		if vim.fn.argc() == 0 and has_session() then
 			vim.schedule(function()
 				pcall(ms.read, sess_name, { verbose = false })
 				-- sanitize old tabline from legacy sessions if present
@@ -72,10 +80,16 @@ return {
 		end, {})
 
 		vim.api.nvim_create_user_command("SessionLoad", function()
+			if not has_session() then
+				return vim.notify("No saved session for this project yet", vim.log.levels.WARN)
+			end
 			require("mini.sessions").read("session.vim", { verbose = false })
 		end, {})
 
 		vim.api.nvim_create_user_command("SessionDelete", function()
+			if not has_session() then
+				return vim.notify("No saved session for this project yet", vim.log.levels.WARN)
+			end
 			require("mini.sessions").delete("session.vim", { force = true })
 		end, {})
 
