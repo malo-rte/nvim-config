@@ -9,7 +9,10 @@
 -- The per-config `gdb` field swaps the binary: rust-gdb for Rust (loads the
 -- Rust pretty-printers), or a multiarch/cross gdb for foreign-arch targets.
 --
--- Keymaps (<leader>d = Debug; add `{ "<leader>d", group = "Debug" }` to which-key):
+-- The whole stack (dap + dap-ui + virtual-text + nio) is lazy: it loads on the
+-- first debug key or :Dap* command, not in every editing session.
+--
+-- Keymaps (<leader>d = Debug, declared in `keys` so they trigger the load):
 --   <F5> start/continue · <F10> over · <F11> into · <F12> out
 --   <leader>db breakpoint · dB conditional · dl logpoint
 --   <leader>dc continue · dr REPL · dL run-last · dt terminate
@@ -18,6 +21,115 @@
 return {
 	{
 		"mfussenegger/nvim-dap",
+		cmd = {
+			"DapContinue",
+			"DapToggleBreakpoint",
+			"DapToggleRepl",
+			"DapStepOver",
+			"DapStepInto",
+			"DapStepOut",
+			"DapTerminate",
+			"DapPause",
+			"DapDisconnect",
+			"DapRestartFrame",
+			"DapClearBreakpoints",
+			"DapShowLog",
+			"DapSetLogLevel",
+		},
+		keys = {
+			{
+				"<F5>",
+				function()
+					require("dap").continue()
+				end,
+				desc = "Debug: start/continue",
+			},
+			{
+				"<F10>",
+				function()
+					require("dap").step_over()
+				end,
+				desc = "Debug: step over",
+			},
+			{
+				"<F11>",
+				function()
+					require("dap").step_into()
+				end,
+				desc = "Debug: step into",
+			},
+			{
+				"<F12>",
+				function()
+					require("dap").step_out()
+				end,
+				desc = "Debug: step out",
+			},
+			{
+				"<leader>dc",
+				function()
+					require("dap").continue()
+				end,
+				desc = "Continue / start",
+			},
+			{
+				"<leader>db",
+				function()
+					require("dap").toggle_breakpoint()
+				end,
+				desc = "Toggle breakpoint",
+			},
+			{
+				"<leader>dB",
+				function()
+					require("dap").set_breakpoint(vim.fn.input("Breakpoint condition: "))
+				end,
+				desc = "Conditional breakpoint",
+			},
+			{
+				"<leader>dl",
+				function()
+					require("dap").set_breakpoint(nil, nil, vim.fn.input("Log point message: "))
+				end,
+				desc = "Log point",
+			},
+			{
+				"<leader>dr",
+				function()
+					require("dap").repl.toggle()
+				end,
+				desc = "Toggle REPL",
+			},
+			{
+				"<leader>dL",
+				function()
+					require("dap").run_last()
+				end,
+				desc = "Run last",
+			},
+			{
+				"<leader>dt",
+				function()
+					require("dap").terminate()
+				end,
+				desc = "Terminate",
+			},
+			{
+				"<leader>du",
+				function()
+					require("dapui").toggle()
+				end,
+				desc = "Toggle DAP UI",
+			},
+			{
+				"<leader>de",
+				function()
+					require("dapui").eval()
+				end,
+				mode = { "n", "v" },
+				desc = "Eval expression",
+			},
+		},
 		dependencies = {
 			"rcarriga/nvim-dap-ui",
 			"theHamsta/nvim-dap-virtual-text",
@@ -124,30 +236,6 @@ return {
 			dap.listeners.before.event_exited["dapui"] = function()
 				ui.close()
 			end
-
-			--------------------------------------------------------------
-			-- Keymaps
-			--------------------------------------------------------------
-			local map = vim.keymap.set
-			map("n", "<F5>", dap.continue, { desc = "Debug: start/continue" })
-			map("n", "<F10>", dap.step_over, { desc = "Debug: step over" })
-			map("n", "<F11>", dap.step_into, { desc = "Debug: step into" })
-			map("n", "<F12>", dap.step_out, { desc = "Debug: step out" })
-			map("n", "<leader>dc", dap.continue, { desc = "Continue / start" })
-			map("n", "<leader>db", dap.toggle_breakpoint, { desc = "Toggle breakpoint" })
-			map("n", "<leader>dB", function()
-				dap.set_breakpoint(vim.fn.input("Breakpoint condition: "))
-			end, { desc = "Conditional breakpoint" })
-			map("n", "<leader>dl", function()
-				dap.set_breakpoint(nil, nil, vim.fn.input("Log point message: "))
-			end, { desc = "Log point" })
-			map("n", "<leader>dr", dap.repl.toggle, { desc = "Toggle REPL" })
-			map("n", "<leader>dL", dap.run_last, { desc = "Run last" })
-			map("n", "<leader>dt", dap.terminate, { desc = "Terminate" })
-			map("n", "<leader>du", ui.toggle, { desc = "Toggle DAP UI" })
-			map({ "n", "v" }, "<leader>de", function()
-				ui.eval()
-			end, { desc = "Eval expression" })
 		end,
 	},
 }
