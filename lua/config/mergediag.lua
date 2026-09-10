@@ -95,17 +95,45 @@ function M.refresh(bufnr)
 	end
 end
 
+-- M.refresh reads and scans every line, and TextChanged fires on every
+-- normal-mode edit, so edits are debounced (a generation counter rather than a
+-- uv timer, so there is no handle to leak per buffer). Reads and writes are
+-- rare and want the sign column correct immediately, so they refresh directly.
+local DEBOUNCE_MS = 150
+local pending = {}
+
+local function refresh_soon(bufnr)
+	local gen = (pending[bufnr] or 0) + 1
+	pending[bufnr] = gen
+	vim.defer_fn(function()
+		if pending[bufnr] ~= gen then
+			return -- superseded by a later edit
+		end
+		pending[bufnr] = nil
+		if vim.api.nvim_buf_is_valid(bufnr) then
+			M.refresh(bufnr)
+		end
+	end, DEBOUNCE_MS)
+end
+
 local group = vim.api.nvim_create_augroup("MergeConflictDiagnostics", { clear = true })
-vim.api.nvim_create_autocmd({ "BufReadPost", "BufWritePost", "TextChanged", "InsertLeave" }, {
+vim.api.nvim_create_autocmd({ "BufReadPost", "BufWritePost" }, {
 	group = group,
 	callback = function(ev)
 		M.refresh(ev.buf)
+	end,
+})
+vim.api.nvim_create_autocmd({ "TextChanged", "InsertLeave" }, {
+	group = group,
+	callback = function(ev)
+		refresh_soon(ev.buf)
 	end,
 })
 vim.api.nvim_create_autocmd({ "BufWipeout", "BufDelete" }, {
 	group = group,
 	callback = function(ev)
 		muted[ev.buf] = nil
+		pending[ev.buf] = nil
 	end,
 })
 
