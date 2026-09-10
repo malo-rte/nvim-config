@@ -1,3 +1,9 @@
+-- kitty's config dir, or nil when this machine has none (see `build` below).
+local function kitty_config_dir()
+	local dir = vim.fs.joinpath(vim.env.XDG_CONFIG_HOME or vim.fn.expand("~/.config"), "kitty")
+	return vim.uv.fs_stat(dir) and dir or nil
+end
+
 local opts = {
 	ignored_buftypes = { "nofile", "quickfix", "prompt" },
 	ignored_filetypes = { "NvimTree", "neo-tree" },
@@ -26,7 +32,12 @@ local opts = {
 return {
 	{
 		"mrjones2014/smart-splits.nvim",
-		build = "./kitty/install-kittens.bash",
+		-- install-kittens.bash cp's three .py files into
+		-- ${XDG_CONFIG_HOME:-~/.config}/kitty and fails with
+		-- "cp: ... Not a directory" on any machine that has no kitty config,
+		-- which leaves a permanently failed build in :Lazy. Only useful under
+		-- kitty anyway -- tmux is handled by at_edge below.
+		build = kitty_config_dir() and "./kitty/install-kittens.bash" or nil,
 		lazy = false,
 		opts = opts,
 		config = function(_, o)
