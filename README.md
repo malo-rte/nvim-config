@@ -222,6 +222,14 @@ something you step through with `]q` / `[q` and can edit in place. It clears
 the search highlight on the way, and says so rather than opening an empty list
 if no search is active.
 
+### Line length
+
+`colorcolumn` is 80, but [smartcolumn.nvim](https://github.com/m4xshen/smartcolumn.nvim)
+only draws it once a line in view actually exceeds that, so the ruler is a
+warning rather than permanent furniture. It reads the limit from
+`colorcolumn` itself, a project's `.editorconfig` `max_line_length` overrides
+it, `gitcommit` uses 72, and prose and sidebar filetypes are exempt.
+
 ### Spelling
 
 `spelllang` is English + Swedish, but only languages whose spell file is
