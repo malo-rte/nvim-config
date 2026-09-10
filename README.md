@@ -20,6 +20,7 @@ buffer-local (active only when a language server is attached).
 
 | Prefix | Group |
 |---|---|
+| `<leader>a` | AI/Claude |
 | `<leader>b` | Buffers |
 | `<leader>c` | Code (LSP) |
 | `<leader>d` | Debug |
@@ -32,6 +33,26 @@ buffer-local (active only when a language server is attached).
 | `<leader>w` | Windows |
 | `<leader>x` | Diagnostics/Quickfix |
 | `<leader>y` | Yocto |
+
+### AI / Claude — `<leader>a`
+
+[claudecode.nvim](https://github.com/coder/claudecode.nvim) speaks the same IDE
+protocol as the official VS Code extension, so Claude sees the current file and
+selection, and its edits open as a diff you accept with `:w` or reject with `:q`.
+Requires the `claude` CLI on `PATH`.
+
+| Key | Action |
+|---|---|
+| `<M-a>` | Toggle + focus Claude (also from its terminal) |
+| `<leader>ac` / `<leader>af` | Toggle / focus Claude |
+| `<leader>ar` / `<leader>aC` | Resume a session / continue the last one |
+| `<leader>am` | Select model |
+| `<leader>ab` | Add current buffer as context |
+| `<leader>as` | Send selection (visual) / add file (neo-tree) |
+| `<leader>aa` / `<leader>ad` | Accept / deny diff |
+
+Inside the Claude terminal `<Esc>` goes to Claude (it interrupts a running turn) —
+use `<M-n>` to reach normal mode for scrolling and copying.
 
 ### Buffers — `<leader>b`
 
@@ -184,6 +205,7 @@ Per-project vault in `<project>/.vault/` (git-ignored, never synced).
 | `<C-d>` / `<C-u>` | Half-page down / up, centered |
 | `J` | Join lines, keep cursor position |
 | `<C-S>` | Save (normal/insert/visual) |
+| `<M-n>` | Leave terminal mode (instead of `<C-\><C-n>`) |
 | `<Esc>` | Clear search highlight |
 | `<` / `>` (visual) | Indent and reselect |
 | `p` (visual) | Paste without clobbering the yank register |

@@ -79,6 +79,12 @@ end, { desc = "Toggle: line numbers" })
 -- Quit / session
 vim.keymap.set("n", "<leader>qq", "<cmd>qa<cr>", { desc = "Quit all" })
 
+-- Terminal mode: leave insert-like terminal mode without <C-\><C-n>, which
+-- needs AltGr on a Swedish layout. <Esc> is deliberately left alone -- it
+-- belongs to the program in the terminal (e.g. interrupting Claude), and a
+-- double-<Esc> mapping would stall every press for 'timeoutlen'.
+vim.keymap.set("t", "<M-n>", "<C-\\><C-n>", { desc = "Terminal: leave terminal mode" })
+
 -- Git: jump to the next merge conflict in the buffer
 vim.api.nvim_create_user_command("NextMergeConflict", function()
 	local patterns = { "^<<<<<<< ", "^=======$", "^>>>>>>> " }
