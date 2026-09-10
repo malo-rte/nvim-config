@@ -11,6 +11,17 @@ if env.is_nix then
 	return {}
 end
 
+-- A few mason "packages" are wrappers around a toolchain installer rather than
+-- a download: haskell-language-server shells out to `ghcup`. If that tool is
+-- missing, ensure_installed does not give up -- it retries the install on every
+-- single startup and fails identically every time (the mason log accumulated
+-- months of `ghcup: command not found`), spawning a shell and fetching metadata
+-- each launch. Only request these when their prerequisite is actually on PATH,
+-- and say so once instead of failing silently forever.
+local PREREQUISITE = {
+	hls = "ghcup",
+}
+
 -- Reuse the server list from the lsp/*.lua files so it never drifts from
 -- lua/config/lsp.lua (which enables exactly these).
 local function configured_servers()
@@ -41,11 +52,20 @@ return {
 			local ok, map = pcall(function()
 				return require("mason-lspconfig").get_mappings().lspconfig_to_package
 			end)
-			local ensure = {}
+			local ensure, skipped = {}, {}
 			for _, s in ipairs(configured_servers()) do
-				if not ok or map[s] then
+				local needs = PREREQUISITE[s]
+				if needs and vim.fn.executable(needs) == 0 then
+					skipped[#skipped + 1] = ("%s (needs %s)"):format(s, needs)
+				elseif not ok or map[s] then
 					ensure[#ensure + 1] = s
 				end
+			end
+
+			if #skipped > 0 then
+				vim.schedule(function()
+					vim.notify("mason: not installing " .. table.concat(skipped, ", "), vim.log.levels.WARN)
+				end)
 			end
 			return {
 				ensure_installed = ensure,
