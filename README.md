@@ -207,6 +207,14 @@ Per-project vault in `<project>/.vault/` (git-ignored, never synced).
 | `<leader>inc` | Insert glyph character |
 | `<leader>inn` | Insert glyph name |
 
+### Search
+
+[nvim-hlslens](https://github.com/kevinhwang91/nvim-hlslens) annotates every
+match with its position — `[1/4]` on the nearest one, `[2n 3]` on a match two
+`n` presses away — so `n` / `N` stop being a guess. It starts on `/`, `?` and
+the keys above; `<Esc>` (`:nohlsearch`) clears it. `:HlSearchLensToggle`
+turns the annotations off without disabling search highlighting.
+
 ### Spelling
 
 `spelllang` is English + Swedish, but only languages whose spell file is
@@ -218,6 +226,8 @@ every buffer. `:SpellInstall [lang]` adds a missing one back and fetches it.
 | Key | Action |
 |---|---|
 | `n` / `N` | Next / previous search result, centered |
+| `*` / `#` | Search the word under the cursor forward / backward |
+| `g*` / `g#` | The same, without word boundaries |
 | `<C-d>` / `<C-u>` | Half-page down / up, centered |
 | `J` | Join lines, keep cursor position |
 | `<C-S>` | Save (normal/insert/visual) |

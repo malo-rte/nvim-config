@@ -1,6 +1,6 @@
--- Center screen when jumping
-vim.keymap.set("n", "n", "nzzzv", { desc = "Next search result centered" })
-vim.keymap.set("n", "N", "Nzzzv", { desc = "Previous search result centered" })
+-- Center screen when jumping. n/N live in plugins/hlslens.lua instead: they
+-- keep this centering but also refresh the search lens, and defining them in
+-- one place stops the two definitions from drifting apart.
 vim.keymap.set("n", "<C-d>", "<C-d>zz", { desc = "Half page down (centered)" })
 vim.keymap.set("n", "<C-u>", "<C-u>zz", { desc = "Half page up (centered)" })
 
