@@ -23,6 +23,10 @@
 --   <leader>ad   deny diff   (or just :q)
 -- Inside the terminal, <Esc> belongs to Claude (it interrupts a running turn),
 -- so use <M-n> to reach normal mode for scrolling/copying -- see config/keymaps.
+--
+-- Buffers whose file Claude edits outside the diff flow are reloaded by the
+-- checktime autocmd in config/autocmds.lua -- it lives there, not here, because
+-- this plugin is lazy and the reload has to work before Claude is ever opened.
 
 local opts = {
 	terminal = {
@@ -67,19 +71,4 @@ return {
 		{ "<leader>ad", "<cmd>ClaudeCodeDiffDeny<cr>", desc = "Claude: deny diff" },
 	},
 	opts = opts,
-
-	config = function(_, o)
-		require("claudecode").setup(o)
-
-		-- 'autoread' is set in config/options.lua but nothing triggers it, so
-		-- files Claude edits outside the diff flow would stay stale in a buffer.
-		vim.api.nvim_create_autocmd({ "FocusGained", "TermLeave", "BufEnter" }, {
-			callback = function()
-				if vim.o.buftype == "" then
-					vim.cmd("checktime")
-				end
-			end,
-			desc = "Reload buffers changed on disk (e.g. by Claude)",
-		})
-	end,
 }

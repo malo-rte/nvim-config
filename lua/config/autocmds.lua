@@ -23,6 +23,19 @@ vim.api.nvim_create_autocmd("FileType", {
 	end,
 })
 
+-- 'autoread' is set in config/options.lua but nothing triggers the check, so a
+-- file edited underneath us (by Claude, a rebase, a formatter run in another
+-- terminal) stays stale in the buffer until something else forces a reload.
+vim.api.nvim_create_autocmd({ "FocusGained", "TermLeave", "BufEnter" }, {
+	group = vim.api.nvim_create_augroup("ReloadChangedFiles", { clear = true }),
+	desc = "Reload buffers whose file changed on disk",
+	callback = function(ev)
+		if vim.bo[ev.buf].buftype == "" then
+			vim.cmd("checktime")
+		end
+	end,
+})
+
 -- Make window separators brighter
 vim.api.nvim_create_autocmd("ColorScheme", {
 	group = vim.api.nvim_create_augroup("WindowSeparators", { clear = true }),
