@@ -19,8 +19,17 @@ vim.keymap.set("v", ">", ">gv", { desc = "Indent right and reselect" })
 -- Join behaviour
 vim.keymap.set("n", "J", "mzJ`z", { desc = "Join lines and keep the cursor postion" })
 
--- Delete buffer without closing the window
-vim.keymap.set("n", "<leader>bd", "<cmd>bdelete<CR>", { desc = "Delete buffer" })
+-- Delete buffer without closing the window. :bdelete closes every window the
+-- buffer is displayed in; mini.bufremove swaps in another buffer first, which
+-- is the behaviour this map has always claimed to have.
+vim.keymap.set("n", "<leader>bd", function()
+	local ok, bufremove = pcall(require, "mini.bufremove")
+	if ok then
+		bufremove.delete(0, false)
+	else
+		vim.cmd("bdelete")
+	end
+end, { desc = "Delete buffer" })
 
 -- Save buffer(s)
 vim.keymap.set({ "n", "i", "v" }, "<C-S>", "<cmd>update<cr>", { desc = "Save buffer if modified" })
