@@ -55,8 +55,6 @@ return {
 				},
 			},
 
-			on_qf = function(bufnr) end,
-
 			edit = {
 				-- Enable editing the quickfix like a normal buffer
 				enabled = true,
