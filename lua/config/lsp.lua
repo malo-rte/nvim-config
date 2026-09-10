@@ -63,7 +63,11 @@ vim.api.nvim_create_autocmd("LspAttach", {
 			vim.diagnostic.jump({ count = 1 })
 		end, "Next diagnostic")
 
-		map("<leader>cs", "<cmd>LspClangdSwitchSourceHeader<cr>", "Switch header/source")
+		-- clangd only: lsp/clangd.lua creates this command buffer-locally in its
+		-- on_attach, so mapping it for every server gives E492 in other buffers.
+		if client.name == "clangd" then
+			map("<leader>cs", "<cmd>LspClangdSwitchSourceHeader<cr>", "Switch header/source")
+		end
 	end,
 })
 
