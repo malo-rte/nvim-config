@@ -10,6 +10,10 @@ suite, git tooling (diffview + git-conflict + mini.diff), DAP debugging,
 Obsidian-style per-project notes, Yocto/BitBake helpers, and a spec-driven
 icon system.
 
+Most of that is lazy — Telescope, the debugger, Obsidian, diffview and the
+markdown tooling load on the first key, command or filetype that needs them, so
+a plain editing session starts about half of the plugin list.
+
 ## Keybindings
 
 `<leader>` is **Space**. Press `<leader>` and wait to see the
@@ -102,12 +106,15 @@ use `<M-n>` to reach normal mode for scrolling and copying.
 
 | Key | Action |
 |---|---|
-| `<leader>uf` | Toggle format-on-save (buffer) |
+| `<leader>uf` | Toggle format-on-save (this file) |
+| `<leader>uF` | Toggle format-on-save (this project) |
+| `<leader>ud` | Clear this file's format-on-save override |
 | `<leader>uh` | Toggle inlay hints (LSP buffer) |
 | `<leader>ui` / `<leader>uI` | Toggle indent-scope (buffer / global) |
 | `<leader>us` | Toggle spell |
 | `<leader>uw` | Toggle wrap |
 | `<leader>ul` | Toggle line numbers |
+| `<leader>un` | Notification history (mini.notify) |
 
 ### Git — `<leader>g`
 
@@ -118,6 +125,9 @@ use `<M-n>` to reach normal mode for scrolling and copying.
 | `<leader>gf` / `<leader>gF` | Diffview: file / repo history |
 | `<leader>gx` | Diffview: close |
 | `<leader>go` | Toggle inline diff overlay (mini.diff) |
+| `<leader>gS` | Git status tree (neo-tree) |
+| `gh` / `gH` | Apply / reset hunk (mini.diff) |
+| `[h` / `]h` | Previous / next hunk (`[H` / `]H` first/last) |
 | `<leader>gu` | Pick unmerged file |
 | `<leader>gC` | Conflicts → quickfix |
 | `<leader>gm` | Next merge conflict |
@@ -197,6 +207,12 @@ Per-project vault in `<project>/.vault/` (git-ignored, never synced).
 | `<leader>inc` | Insert glyph character |
 | `<leader>inn` | Insert glyph name |
 
+### Spelling
+
+`spelllang` is English + Swedish, but only languages whose spell file is
+actually present are enabled — otherwise Neovim prompts to download one for
+every buffer. `:SpellInstall [lang]` adds a missing one back and fetches it.
+
 ### Editing (non-leader)
 
 | Key | Action |
@@ -213,7 +229,12 @@ Per-project vault in `<project>/.vault/` (git-ignored, never synced).
 | `gc` / `gcc` | Comment (operator / line) |
 | `sa` `sd` `sr` `sf` `sh` | Surround add / delete / replace / find / highlight (mini.surround) |
 | `af` `if` `ac` `ic` `aa` `ia` | Function / class / parameter textobjects |
+| `ab` `ib` / `aC` `iC` | Block-or-conditional-or-loop / comment textobjects (mini.ai) |
+| `an` `in` / `al` `il` | Same textobjects, next / last match (mini.ai) |
+| `ii` `ai` / `[i` `]i` | Indent scope textobject / jump to its top, bottom |
 | `]f` / `[f` | Next / previous function |
+| `<C-Space>` | Expand selection to the next treesitter node (normal or visual) |
+| `<BS>` (visual) | Shrink the treesitter selection back |
 
 ## Layout
 
