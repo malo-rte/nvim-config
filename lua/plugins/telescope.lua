@@ -115,7 +115,6 @@ return {
 		{ "nvim-lua/plenary.nvim" },
 		{ "nvim-telescope/telescope-fzf-native.nvim", build = "make", cond = vim.fn.executable("make") == 1 },
 		{ "nvim-telescope/telescope-frecency.nvim" },
-		{ "kkharji/sqlite.lua", enabled = true }, -- speeds up telescope-frecency
 		{ "nvim-telescope/telescope-ui-select.nvim" }, -- route vim.ui.select through Telescope
 	},
 	opts = opts,
