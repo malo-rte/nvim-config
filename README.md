@@ -62,6 +62,7 @@ use `<M-n>` to reach normal mode for scrolling and copying.
 
 | Key | Action |
 |---|---|
+| `<leader>bb` | Buffer picker (Telescope) |
 | `<leader>bn` / `<leader>bp` | Next / previous buffer |
 | `<leader>bd` | Delete buffer (keep window) |
 | `<leader>bs` | Save if modified |
@@ -74,7 +75,6 @@ use `<M-n>` to reach normal mode for scrolling and copying.
 | `<leader>ff` | Find files (project root) |
 | `<leader>fg` | Live grep (project root) |
 | `<leader>fr` | Frecency / recent (project) |
-| `<leader>fb` | Find buffers |
 | `<leader>fe` | Explorer at project root (neo-tree) |
 | `<leader>fp` | Find & switch project |
 

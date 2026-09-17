@@ -63,7 +63,7 @@ return {
 	-- requires it from inside a function, which pulls it in on demand.
 	cmd = { "Telescope", "ProjectPick", "ProjectFiles", "ProjectGrep" },
 	keys = {
-		{ "<leader>fb", "<cmd>Telescope buffers theme=ivy<cr>", desc = "Find buffers" },
+		{ "<leader>bb", "<cmd>Telescope buffers theme=ivy<cr>", desc = "Buffer picker (Telescope)" },
 		{
 			"<leader>ff",
 			function()
