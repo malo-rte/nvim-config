@@ -26,23 +26,34 @@ out blank/invisible.
 
 ## Testing the config (headless)
 
-The repo is **not** at `~/.config/nvim` here — it's the container's workspace
-mount, `/workspaces/<repo dir name>` (currently `/workspaces/nvim`, since
-`enter-dev-container.sh` derives it from the repo directory). Plain `nvim` won't
-load it. To boot the real config headless, against a **copy**, so nothing the
-boot writes lands in the repo:
+Inside the dev container, plain `nvim` loads this repo: the image symlinks
+`~/.config/nvim` at the bind mount (`/workspaces/<repo dir name>`, currently
+`/workspaces/nvim` — `enter-dev-container.sh` derives it from the repo
+directory). That is the interactive loop; note it writes `lazy-lock.json` into
+the repo, which is right when you are bumping plugins and wrong in a check.
 
-```sh
-tmp=$(mktemp -d); mkdir -p "$tmp/cfg/nvim"
-tar -C /workspaces/nvim --exclude=.git -cf - . | tar -C "$tmp/cfg/nvim" -xf -
-XDG_CONFIG_HOME="$tmp/cfg" XDG_DATA_HOME="$tmp/data" XDG_STATE_HOME="$tmp/state" \
-  nvim --headless "+lua vim.defer_fn(function() vim.cmd('qa!') end, 6000)"
-```
+Two scripts wrap the checks so nothing has to be retyped:
+
+- **`scripts/check.sh`** — everything at once: `stylua --check`, a `loadfile`
+  parse of every Lua file, `luacheck`, a Plane-15 glyph report, a staleness
+  check on the generated `ftype_icons.lua`, `bash -n` + `shellcheck` on the
+  scripts, `py_compile`, the sandbox boot, and `audit_keymaps.py`. A tool that
+  is not installed is reported as **skip**, never a silent pass. `--fix` lets
+  the formatters write; `scripts/check.sh boot keymaps` runs a subset;
+  `--list` names them. Run it in the container:
+  `docker/enter-dev-container.sh scripts/check.sh`.
+- **`scripts/nvim-sandbox.sh`** — boots the config against a **copy** so
+  nothing the boot writes lands in the repo. Default shares the real plugin /
+  mason / parser state (seconds, not a full reinstall) and isolates only the
+  config; `--clean` isolates everything. `--lua '<chunk>'` runs a chunk in the
+  booted config (that is how to inspect anything live), and `-- <args>` starts
+  a real nvim on the copy.
 
 - **Boot against a copy, not a symlink to the repo.** lazy.nvim writes
   `lazy-lock.json` into `stdpath('config')`, so a symlinked boot rewrites the
-  committed lockfile — and if `$NVIM_TS_PARSERS` is set for the test, `mason.lua`
-  returns `{}` and the boot *deletes* the mason entries from it.
+  committed lockfile — and if `$NVIM_TS_PARSERS` is set for the test,
+  `mason.lua` returns `{}` and the boot *deletes* the mason entries from it.
+  That is what the sandbox script is for.
 - Setting `$NVIM_TS_PARSERS` to a throwaway dir is the way to skip compiling ~50
   treesitter parsers in a smoke test — but it puts the config on its **NixOS**
   path (`env.is_nix`), so mason is skipped and the portable branch goes untested.
@@ -105,10 +116,31 @@ XDG_CONFIG_HOME="$tmp/cfg" XDG_DATA_HOME="$tmp/data" XDG_STATE_HOME="$tmp/state"
 ## Docker (dev container)
 
 - **No Docker daemon inside this container** — can't run `docker build`;
-  Dockerfile changes are verified only to the crate/asset level, not a real build.
-- The image chain is `nvim-config-build` (base toolchains, `FROM debian:13`) →
-  `nvim-config-dev` (shell tools, Neovim, Claude Code, ghcup, smartcard runtime).
-  `enter-dev-container.sh` builds both in that order and tags them by those
-  names. Keep the `FROM` in `nvim-config-dev/Dockerfile` matching that tag — it
-  previously pointed at `dev-tools-build:latest`, an image nothing here builds,
-  so a from-scratch build could only work by accident.
+  Dockerfile changes are verified only to the package/asset level, not a real
+  build.
+- The image chain is `nvim-config-build` (the toolchains something compiles
+  *at runtime*: cc for treesitter parsers and fzf-native, python3-venv for
+  mason's PyPI packages, git/curl) → `nvim-config-dev` (Neovim, the maintenance
+  toolkit, node, Claude Code, shell tools). `enter-dev-container.sh` builds both
+  in that order and tags them by those names. Keep the `FROM` in
+  `nvim-config-dev/Dockerfile` matching that tag — it previously pointed at
+  `dev-tools-build:latest`, an image nothing here builds, so a from-scratch
+  build could only work by accident.
+- The Debian base is **pinned by digest** (`debian:13.6@sha256:…`) in both
+  Dockerfiles; bump them together. `apt-get` still pulls current packages on
+  every build, so the pin costs no security updates.
+- `nvim-config-dev` is **multi-stage**: a throwaway `rust-tools` stage builds
+  `kdlfmt` and `kdl-lsp` and the runtime image gets only those two binaries —
+  no rustup tree. Anything else that needs `cargo` has to be added there, not
+  installed at runtime.
+- **Neovim state lives in named volumes** (`nvim-dev-<repo>-{share,state,cache}`),
+  so lazy's clones, mason's servers and the ~50 compiled parsers survive
+  `docker run --rm`. The image pre-creates those paths as the dev user — that is
+  what gives a fresh volume the right ownership. Wipe them to test a cold start:
+  `docker volume rm nvim-dev-nvim-{share,state,cache}`.
+- Haskell (ghcup/ghc/HLS) is **opt-in**: `WITH_HASKELL=1 docker/enter-dev-container.sh`.
+  It is multi-GB for one of 19 servers, and `mason.lua` already handles a
+  missing `ghcup` deliberately (reports hls as skipped once instead of retrying
+  every startup).
+- `enter-dev-container.sh` takes a command (`… scripts/check.sh` runs it and
+  exits, no TTY when piped) and honours `SKIP_BUILD=1` to reuse the images.

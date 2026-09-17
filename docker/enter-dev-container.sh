@@ -1,4 +1,16 @@
 #!/usr/bin/env  bash
+#
+# Build (if needed) and enter the dev container for this Neovim config.
+#
+#   ./docker/enter-dev-container.sh                 # interactive shell
+#   ./docker/enter-dev-container.sh scripts/check.sh  # run one command, exit
+#   SKIP_BUILD=1 ./docker/enter-dev-container.sh    # reuse the existing images
+#   WITH_HASKELL=1 ./docker/enter-dev-container.sh  # include ghcup/ghc/hls
+#
+# Inside, plain `nvim` loads this repo (the image symlinks ~/.config/nvim at
+# the bind mount), and lazy/mason/treesitter state lives in named volumes so
+# the first-run install and the ~50 parser compiles happen once, not on every
+# `docker run --rm`.
 set -euo pipefail
 
 BUILD_IMAGE="nvim-config-build"
@@ -22,7 +34,19 @@ CLAUDE_CONFIG_CONTAINER="/home/$(id -un)/.claude"
 mkdir -p "${CLAUDE_STATE_HOST}"
 
 CLAUDE_FLAGS=(-v "${CLAUDE_STATE_HOST}:${CLAUDE_CONFIG_CONTAINER}${MOUNT_SUFFIX}")
-RUST_FLAGS=(-v "claude-dev-cargo:/home/$(id -un)/.cargo/registry${MOUNT_SUFFIX}")
+
+# Neovim's own state, kept in named volumes rather than thrown away with the
+# container: lazy's plugin clones and lockfile-driven checkouts, mason's
+# servers, and the treesitter parsers the portable path compiles locally
+# (~50 of them -- minutes of cc on a cold start). The image pre-creates these
+# paths as the dev user so a fresh volume inherits the right ownership.
+# Drop them with: docker volume rm nvim-dev-${REPO_NAME}-{share,state,cache}
+NVIM_HOME="/home/$(id -un)"
+NVIM_STATE_FLAGS=(
+	-v "nvim-dev-${REPO_NAME}-share:${NVIM_HOME}/.local/share/nvim${MOUNT_SUFFIX}"
+	-v "nvim-dev-${REPO_NAME}-state:${NVIM_HOME}/.local/state/nvim${MOUNT_SUFFIX}"
+	-v "nvim-dev-${REPO_NAME}-cache:${NVIM_HOME}/.cache/nvim${MOUNT_SUFFIX}"
+)
 
 SSH_FLAGS=()
 if [[ -n "${SSH_AUTH_SOCK:-}" && -S "${SSH_AUTH_SOCK}" ]]; then
@@ -39,38 +63,18 @@ if [[ -d "${HOME}/.ssh" ]]; then
 	SSH_FLAGS+=(-v "${HOME}/.ssh:/home/$(id -un)/.ssh:ro${MOUNT_SUFFIX}")
 fi
 
-# USB pass-through (for YubiKey / smartcard work via age-plugin-yubikey).
-# Bind-mounting /dev/bus/usb (rather than --device) propagates hotplug
-# events from the host: a YubiKey unplugged + replugged after the
-# container starts becomes visible inside. The bind-mount alone only
-# makes the device nodes visible — Docker's default device cgroup still
-# denies I/O on them. --device-cgroup-rule 'c 189:* rwm' grants r/w/mknod
-# on USB character devices (major 189), so libusb_open works for any
-# device that appears later via hotplug.
-USB_FLAGS=()
-if [[ -d /dev/bus/usb ]]; then
-	USB_FLAGS+=(
-		--volume "/dev/bus/usb:/dev/bus/usb${MOUNT_SUFFIX}"
-		--device-cgroup-rule "c 189:* rwm"
-	)
-	# Map the host's plugdev group if it exists (Debian/Ubuntu YubiKey
-	# udev rules typically grant `0664 root:plugdev` on the device file).
-	if command -v getent >/dev/null 2>&1; then
-		PLUGDEV_GID="$(getent group plugdev 2>/dev/null | cut -d: -f3 || true)"
-		[[ -n "${PLUGDEV_GID}" ]] && USB_FLAGS+=(--group-add "${PLUGDEV_GID}")
-	fi
-else
-	echo "Note: /dev/bus/usb not present on host. YubiKey work will not be possible." >&2
-fi
-
+# build_container <image> [extra --build-arg ...]
+# Only the args an image actually declares are passed; docker warns about
+# unconsumed ones.
 build_container() {
 	local image="$1"
+	shift
 
 	docker build \
 		--build-arg USER_NAME="$(id -un)" \
 		--build-arg USER_UID="$(id -u)" \
 		--build-arg USER_GID="$(id -g)" \
-		--build-arg REPO_DIR="${REPO_DIR_CONTAINER}" \
+		"$@" \
 		-f "${SCRIPT_DIR}/${image}/Dockerfile" \
 		-t "${image}" \
 		"${SCRIPT_DIR}/${image}"
@@ -78,6 +82,7 @@ build_container() {
 
 run_container() {
 	local image="$1"
+	shift
 	local tz_flags=()
 	local locale_flags=()
 
@@ -96,20 +101,32 @@ run_container() {
 	[[ -n "${LC_ALL:-}" ]] && locale_flags+=(-e "LC_ALL=${LC_ALL}")
 	[[ -n "${LC_TIME:-}" ]] && locale_flags+=(-e "LC_TIME=${LC_TIME}")
 
-	docker run --rm -it --init \
+	# A command given on the command line runs non-interactively (no TTY when
+	# stdout is a pipe, so CI-style `... scripts/check.sh > log` behaves).
+	local tty_flags=(-i)
+	[[ -t 0 && -t 1 ]] && tty_flags+=(-t)
+
+	local cmd=("$@")
+	[[ ${#cmd[@]} -eq 0 ]] && cmd=(bash)
+
+	docker run --rm --init \
+		"${tty_flags[@]}" \
 		--user "$(id -u):$(id -g)" \
 		"${CLAUDE_FLAGS[@]}" \
-		"${RUST_FLAGS[@]}" \
+		"${NVIM_STATE_FLAGS[@]}" \
 		"${SSH_FLAGS[@]}" \
-		"${USB_FLAGS[@]}" \
 		"${tz_flags[@]}" \
 		"${locale_flags[@]}" \
 		--volume "${REPO_DIR}:${REPO_DIR_CONTAINER}${MOUNT_SUFFIX}" \
 		-w "${REPO_DIR_CONTAINER}" \
-		"${image}:latest" bash
+		"${image}:latest" "${cmd[@]}"
 }
 
-build_container "${BUILD_IMAGE}"
-build_container "${DEV_IMAGE}"
+if [[ "${SKIP_BUILD:-0}" != "1" ]]; then
+	build_container "${BUILD_IMAGE}"
+	build_container "${DEV_IMAGE}" \
+		--build-arg REPO_DIR="${REPO_DIR_CONTAINER}" \
+		--build-arg WITH_HASKELL="${WITH_HASKELL:-0}"
+fi
 
-run_container "${DEV_IMAGE}"
+run_container "${DEV_IMAGE}" "$@"

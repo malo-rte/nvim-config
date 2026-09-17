@@ -1,4 +1,5 @@
-export PATH="${PATH}:${HOME}/.local/bin:${HOME}/.cargo/bin"
+# PATH additions live in the image (ENV PATH), so a one-shot
+# `docker run ... <cmd>` sees the same tools an interactive shell does.
 export SHELL=/bin/bash
 
 # direnv requires per-directory `direnv allow` from the host; the container
