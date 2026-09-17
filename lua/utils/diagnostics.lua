@@ -20,7 +20,16 @@ M.setup = function()
 		severity_sort = true,
 		update_in_insert = false,
 		float = { source = "if_many" },
-		jump = { float = true },
+		-- `jump.float = true` is deprecated (Nvim removes it in 0.14) and
+		-- on_jump replaces it. bufnr/scope/focus below are exactly what
+		-- Neovim's own compatibility shim passes for the boolean form, so
+		-- the behaviour is unchanged: float the diagnostic under the
+		-- cursor after a jump, without stealing focus.
+		jump = {
+			on_jump = function(_, bufnr)
+				vim.diagnostic.open_float({ bufnr = bufnr, scope = "cursor", focus = false })
+			end,
+		},
 	})
 end
 
