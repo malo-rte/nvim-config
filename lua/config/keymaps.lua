@@ -85,6 +85,20 @@ vim.keymap.set("n", "<leader>ul", function()
 	vim.opt_local.relativenumber = on
 end, { desc = "Toggle: line numbers" })
 
+-- Project root level (<leader>p): git reports the *innermost* repo, so inside
+-- a submodule every root-anchored operation (find/grep, neo-tree, the vault,
+-- the autoformat marker search) scopes to the submodule. These walk the repo
+-- ladder and pin the level; see lua/config/project.lua.
+vim.keymap.set("n", "<leader>pu", function()
+	require("config.project").root_up()
+end, { desc = "Project root: up a level (superproject)" })
+vim.keymap.set("n", "<leader>pd", function()
+	require("config.project").root_down()
+end, { desc = "Project root: down a level (submodule)" })
+vim.keymap.set("n", "<leader>pr", function()
+	require("config.project").root_reset()
+end, { desc = "Project root: reset to the buffer's repo" })
+
 -- Quit / session
 vim.keymap.set("n", "<leader>qq", "<cmd>qa<cr>", { desc = "Quit all" })
 

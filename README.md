@@ -172,6 +172,25 @@ Per-project vault in `<project>/.vault/` (git-ignored, never synced).
 | `<leader>ox` | Toggle checkbox |
 | `<leader>om` / `<leader>oM` | Mindmap: open / live-watch (markmap) |
 
+### Project / repo level — `<leader>p`
+
+Root-anchored operations (find, grep, neo-tree, the vault, the autoformat
+marker search) scope to the repo `git rev-parse --show-toplevel` reports, which
+is always the **innermost** one — inside a submodule that is the submodule.
+These walk the repo ladder and pin the level; a pinned root shows with a `↕`
+after the path in the statusline.
+
+| Key | Action |
+|---|---|
+| `<leader>pu` | Root: up a level (submodule → superproject) |
+| `<leader>pd` | Root: down a level (into a submodule / nested repo) |
+| `<leader>pr` | Root: reset to the buffer's own repo |
+
+`<leader>pd` takes the submodule the current buffer is in when there is one,
+otherwise it asks (via `vim.ui.select`, so through Telescope). The pin applies
+only while you are inside that tree — switch to an unrelated project and the
+level resolves normally again, switch back and your pin is still there.
+
 ### Quit / Session — `<leader>q`
 
 | Key | Action |

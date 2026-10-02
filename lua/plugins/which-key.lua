@@ -39,6 +39,7 @@ return {
 			{ "<leader>i", group = "Insert" },
 			{ "<leader>in", group = "Insert Nerdfont" },
 			{ "<leader>o", group = "Obsidian/Notes" },
+			{ "<leader>p", group = "Project" },
 			{ "<leader>q", group = "Quit/Session" },
 			{ "<leader>u", group = "UI/Toggle" },
 			{ "<leader>w", group = "Windows" },

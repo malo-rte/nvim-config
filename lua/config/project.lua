@@ -11,6 +11,7 @@ local uv_fs_scandir_next = vim.uv.fs_scandir_next
 ---@diagnostic enable: undefined-field
 
 local root_cache = {}
+local root_pin = nil
 
 local MARKERS = { ".git", "Cargo.toml", "go.mod", "pyproject.toml", "package.json" }
 local DEFAULT_IGNORE = {
@@ -75,6 +76,24 @@ local function within(dir, base)
 	return dir == base or dir:sub(1, #base + 1) == base .. "/"
 end
 
+-- The repo git reports for `path`, cached. The answer depends on the cwd as
+-- well as the path (the anchoring in M.project_root), so both belong in the
+-- key. Caching by path alone needed a full wipe on every BufEnter, which meant
+-- a synchronous `git rev-parse` per buffer switch -- on the UI thread, since
+-- the statusline asks for the root on redraw. Call M.clear_root_cache() if a
+-- repo appears mid-session.
+local function resolve(cwd, path, no_cache)
+	local key = cwd .. "\0" .. path
+	if not no_cache and root_cache[key] then
+		return root_cache[key]
+	end
+	local root = compute_root(path)
+	if not no_cache then
+		root_cache[key] = root
+	end
+	return root
+end
+
 function M.project_root(opts)
 	opts = opts or {}
 	local path = vim.fn.fnamemodify(opts.path or start_dir(), ":p")
@@ -87,20 +106,20 @@ function M.project_root(opts)
 		path = vim.fn.fnamemodify(cwd, ":p")
 	end
 
-	-- The answer depends on the cwd as well as the path (the anchoring above),
-	-- so both belong in the key. Caching by path alone needed a full wipe on
-	-- every BufEnter, which meant a synchronous `git rev-parse` per buffer
-	-- switch -- on the UI thread, since the statusline asks for the root on
-	-- redraw. Call M.clear_root_cache() if a repo appears mid-session.
-	local key = cwd .. "\0" .. path
-	if not opts.no_cache and root_cache[key] then
-		return root_cache[key]
+	local natural = resolve(cwd, path, opts.no_cache)
+
+	-- A pinned repo level (M.root_up / M.root_down) applies in two cases, and
+	-- both are needed: the path is inside the pin (pinned *up* -- a file in a
+	-- submodule while the superproject is pinned), or the pin sits inside the
+	-- repo the path naturally belongs to (pinned *down* -- a file at the
+	-- superproject root while a submodule is pinned, which is exactly the case
+	-- <leader>pd prompts for). Anywhere else the pin is ignored rather than
+	-- cleared, so hopping to an unrelated project and back keeps your level.
+	if root_pin and (within(path, root_pin) or within(root_pin, natural)) then
+		return root_pin
 	end
-	local root = compute_root(path)
-	if not opts.no_cache then
-		root_cache[key] = root
-	end
-	return root
+
+	return natural
 end
 
 function M.clear_root_cache()
@@ -271,6 +290,186 @@ function M.project_picker(root, opts)
 			end,
 		})
 		:find()
+end
+
+-- ---------------------------------------------------------------------------
+-- Repo level: submodules and nested repositories
+--
+-- compute_root() asks git for --show-toplevel, which is always the *innermost*
+-- repo. Inside a submodule that means every picker, the neo-tree root, the
+-- vault and the autoformat marker lookup anchor to the submodule, with no way
+-- to say "I mean the superproject". These move that anchor one level at a time
+-- and pin it; the statusline shows the pinned root with a trailing marker.
+-- ---------------------------------------------------------------------------
+
+local function git(dir, args)
+	local cmd = { "git", "-C", dir }
+	vim.list_extend(cmd, args)
+	local out = vim.fn.systemlist(cmd)
+	if vim.v.shell_error ~= 0 then
+		return nil
+	end
+	return out
+end
+
+--- The repo one level up: a submodule's superproject if there is one, else the
+--- nearest enclosing directory with a project marker (plain nested repos --
+--- git has no opinion about those, so fall back to the marker search).
+---@param root string
+---@return string|nil
+function M.parent_root(root)
+	local out = git(root, { "rev-parse", "--show-superproject-working-tree" })
+	if out and out[1] and out[1] ~= "" then
+		return vim.fs.normalize(out[1])
+	end
+	local parent = vim.fs.dirname(root)
+	if not parent or parent == root then
+		return nil
+	end
+	local found = root_by_markers(parent)
+	-- root_by_markers starts at `parent`, so a marker *in* root cannot match;
+	-- guard anyway against a symlinked path resolving back onto itself.
+	if found and vim.fs.normalize(found) ~= vim.fs.normalize(root) then
+		return vim.fs.normalize(found)
+	end
+end
+
+--- Repos directly under `root`: registered submodules first (git knows those
+--- even when they are not checked out), then any other nested repo found by
+--- scanning. The scan stops descending at each repo it finds, so a submodule
+--- inside a submodule is reached by stepping down twice, not in one jump.
+---@param root string
+---@return string[]
+function M.child_roots(root)
+	root = vim.fs.normalize(vim.fn.fnamemodify(root, ":p"))
+	local seen, out = {}, {}
+	local function add(dir)
+		dir = vim.fs.normalize(dir)
+		if dir ~= root and not seen[dir] and uv_fs_stat(dir) then
+			seen[dir] = true
+			out[#out + 1] = dir
+		end
+	end
+
+	for _, line in ipairs(git(root, { "submodule", "--quiet", "foreach", "echo $toplevel/$sm_path" }) or {}) do
+		if line ~= "" then
+			add(line)
+		end
+	end
+
+	local function ignored(name)
+		for _, d in ipairs(DEFAULT_IGNORE) do
+			if name == d then
+				return true
+			end
+		end
+		return false
+	end
+
+	local function scan(dir, depth)
+		if depth > 3 then
+			return
+		end
+		local ok, iter = pcall(uv_fs_scandir, dir)
+		if not ok or not iter then
+			return
+		end
+		while true do
+			local name, typ = uv_fs_scandir_next(iter)
+			if not name then
+				break
+			end
+			if typ == "directory" and not ignored(name) then
+				local child = vim.fs.joinpath(dir, name)
+				if has_marker(child, { ".git" }) then
+					add(child)
+				else
+					scan(child, depth + 1)
+				end
+			end
+		end
+	end
+	scan(root, 1)
+
+	table.sort(out)
+	return out
+end
+
+--- The pinned root, or nil when the level is whatever git says.
+---@return string|nil
+function M.pinned_root()
+	return root_pin
+end
+
+local function pin(dir, how)
+	root_pin = vim.fs.normalize(dir)
+	M.clear_root_cache()
+	vim.notify(("project root %s: %s"):format(how, vim.fn.fnamemodify(root_pin, ":~")), vim.log.levels.INFO)
+	pcall(vim.cmd.redrawstatus)
+end
+
+--- Pin the next repo level up (submodule -> superproject -> ...).
+function M.root_up()
+	local cur = M.project_root()
+	local up = M.parent_root(cur)
+	if not up then
+		vim.notify(
+			("project root: %s is already the outermost repo"):format(vim.fn.fnamemodify(cur, ":~")),
+			vim.log.levels.WARN
+		)
+		return
+	end
+	pin(up, "up")
+end
+
+--- Pin a repo level down. The submodule the current buffer lives in is the
+--- obvious answer when there is one; otherwise pick from the children.
+function M.root_down()
+	local cur = M.project_root()
+	local kids = M.child_roots(cur)
+	if #kids == 0 then
+		vim.notify(
+			("project root: no submodule or nested repo under %s"):format(vim.fn.fnamemodify(cur, ":~")),
+			vim.log.levels.WARN
+		)
+		return
+	end
+
+	local here = start_dir()
+	for _, k in ipairs(kids) do
+		if within(here, k) then
+			return pin(k, "down")
+		end
+	end
+
+	if #kids == 1 then
+		return pin(kids[1], "down")
+	end
+
+	-- vim.ui.select, so this goes through Telescope via the shim in the
+	-- telescope spec without requiring it here (it is a lazy plugin).
+	vim.ui.select(kids, {
+		prompt = "Project root: down into",
+		format_item = function(d)
+			return vim.fn.fnamemodify(d, ":~")
+		end,
+	}, function(choice)
+		if choice then
+			pin(choice, "down")
+		end
+	end)
+end
+
+--- Drop the pin: back to the repo git reports for the current buffer.
+function M.root_reset()
+	if not root_pin then
+		vim.notify("project root: not pinned", vim.log.levels.INFO)
+		return
+	end
+	root_pin = nil
+	M.clear_root_cache()
+	vim.notify("project root: " .. vim.fn.fnamemodify(M.project_root(), ":~"), vim.log.levels.INFO)
+	pcall(vim.cmd.redrawstatus)
 end
 
 return M

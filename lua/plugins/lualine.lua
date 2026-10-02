@@ -27,7 +27,11 @@ local opts = {
 			function()
 				local ok, project = pcall(require, "config.project")
 				local root = (ok and project.project_root()) or vim.uv.cwd()
-				return " " .. vim.fn.fnamemodify(root, ":~")
+				-- A root pinned with <leader>pu / pd is not the repo git would
+				-- report here, so mark it: an invisible override is a trap.
+				local pinned = ok and project.pinned_root()
+				local mark = (pinned and pinned == root) and " ↕" or ""
+				return " " .. vim.fn.fnamemodify(root, ":~") .. mark
 			end,
 			{
 				"filename",
