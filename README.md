@@ -83,13 +83,14 @@ use `<M-n>` to reach normal mode for scrolling and copying.
 | Key | Action |
 |---|---|
 | `gd` / `gD` | Go to definition / declaration |
-| `gi` | Go to implementation |
+| `gri` | Implementations (Telescope) |
 | `grr` | References (Telescope) |
 | `K` | Hover docs |
+| `<M-s>` | Signature help (normal and insert) |
 | `<leader>ca` | Code action |
 | `<leader>cr` | Rename |
 | `<leader>cs` | Switch header/source (clangd) |
-| `[d` / `]d` | Previous / next diagnostic (also `<S-Up>` / `<S-Down>`) |
+| `[d` / `]d` | Previous / next diagnostic |
 
 ### Diagnostics / Quickfix — `<leader>x`
 

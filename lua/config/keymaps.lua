@@ -17,7 +17,7 @@ vim.keymap.set("v", "<", "<gv", { desc = "Indent left and reselect" })
 vim.keymap.set("v", ">", ">gv", { desc = "Indent right and reselect" })
 
 -- Join behaviour
-vim.keymap.set("n", "J", "mzJ`z", { desc = "Join lines and keep the cursor postion" })
+vim.keymap.set("n", "J", "mzJ`z", { desc = "Join lines and keep the cursor position" })
 
 -- Delete buffer without closing the window. :bdelete closes every window the
 -- buffer is displayed in; mini.bufremove swaps in another buffer first, which

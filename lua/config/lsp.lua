@@ -34,11 +34,20 @@ vim.api.nvim_create_autocmd("LspAttach", {
 		-- Core LSP maps
 		map("gd", vim.lsp.buf.definition, "Go to definition")
 		map("gD", vim.lsp.buf.declaration, "Go to declaration")
-		map("gi", vim.lsp.buf.implementation, "Go to implementation")
 		map("K", vim.lsp.buf.hover, "Hover docs")
 		map("<leader>cr", vim.lsp.buf.rename, "Rename")
 		map("<leader>ca", vim.lsp.buf.code_action, "Code action")
 		map("<leader>uh", toggle_inlay_hints, "Toggle inlay hints")
+
+		-- Neovim's default insert-mode <C-S> is signature help, and keymaps.lua
+		-- takes that key for :update -- so without this there is no
+		-- signature-help key at all (blink.cmp configures no signature window).
+		-- <M-s> is free in both modes and matches the config's other Alt keys.
+		vim.keymap.set({ "n", "i" }, "<M-s>", vim.lsp.buf.signature_help, {
+			buffer = ev.buf,
+			silent = true,
+			desc = "LSP: Signature help",
+		})
 
 		-- Telescope-powered LSP views (diagnostics list is a global map in
 		-- keymaps.lua so it also works in non-LSP buffers)
@@ -46,20 +55,21 @@ vim.api.nvim_create_autocmd("LspAttach", {
 			require("telescope.builtin").lsp_references()
 		end, "References (Telescope)")
 
+		-- Implementations on `gri`, the key Neovim 0.12 already uses for this,
+		-- rather than `gi` -- which is a builtin (resume Insert where it last
+		-- stopped, via the '^ mark) and was being shadowed to duplicate a
+		-- default. Overriding core's native handler the way grr does also makes
+		-- the lsp_implementations picker opts in plugins/telescope.lua reachable.
+		map("gri", function()
+			require("telescope.builtin").lsp_implementations()
+		end, "Implementations (Telescope)")
+
 		-- Diagnostics navigation
 		map("[d", function()
 			vim.diagnostic.jump({ count = -1 })
 		end, "Previous diagnostic")
 
 		map("]d", function()
-			vim.diagnostic.jump({ count = 1 })
-		end, "Next diagnostic")
-
-		map("<S-Up>", function()
-			vim.diagnostic.jump({ count = -1 })
-		end, "Previous diagnostic")
-
-		map("<S-Down>", function()
 			vim.diagnostic.jump({ count = 1 })
 		end, "Next diagnostic")
 
