@@ -476,13 +476,29 @@ function M.project_picker(root, opts)
 
 	local theme = t.themes.get_ivy()
 	local where = vim.fn.fnamemodify(root or uv_cwd(), ":~")
+
+	-- One entry table per path, reused by every finder this picker gets.
+	-- Telescope's selection_strategy = "follow" re-finds the selected entry
+	-- with `container[1] == entry` -- an identity comparison -- so a refresh
+	-- that built fresh tables for the same paths would never match, and the
+	-- selection would snap back to the top on every batch.
+	local entries = {}
+	local function entry_maker(path)
+		local e = entries[path]
+		if not e then
+			e = { value = path, ordinal = path, display = vim.fn.fnamemodify(path, ":~") }
+			entries[path] = e
+		end
+		return e
+	end
+
 	local picker = t.pickers.new(theme, {
 		prompt_title = opts.async and ("Projects (%s) -- scanning"):format(where) or ("Projects (%s)"):format(where),
+		-- Keep the cursor on whatever is selected while results stream in.
+		selection_strategy = opts.async and "follow" or nil,
 		finder = t.finders.new_table({
 			results = projects,
-			entry_maker = function(path)
-				return { value = path, ordinal = path, display = vim.fn.fnamemodify(path, ":~") }
-			end,
+			entry_maker = entry_maker,
 		}),
 		sorter = t.conf.generic_sorter(theme),
 		attach_mappings = function(bufnr, map)
@@ -552,9 +568,7 @@ function M.project_picker(root, opts)
 		picker:refresh(
 			t.finders.new_table({
 				results = vim.list_slice(results, 1, #results),
-				entry_maker = function(path)
-					return { value = path, ordinal = path, display = vim.fn.fnamemodify(path, ":~") }
-				end,
+				entry_maker = entry_maker,
 			}),
 			{ reset_prompt = false }
 		)
