@@ -35,10 +35,13 @@ return {
 			time_format = "%H:%M",
 		},
 
-		-- Wikilink/tag completion via blink.cmp (you use blink, not nvim-cmp).
+		-- Wikilink/tag completion arrives through the LSP source of blink.cmp:
+		-- obsidian.nvim serves it from a built-in `obsidian-ls` server rather
+		-- than a completion-plugin integration, which is why the old
+		-- `nvim_cmp` / `blink` switches are gone (they are deprecated and nil'd
+		-- out by the plugin; removed in obsidian.nvim 4.0). Nothing to opt into
+		-- here -- blink's `lsp` source is already enabled in plugins/blink.lua.
 		completion = {
-			nvim_cmp = false,
-			blink = true,
 			min_chars = 2,
 		},
 
@@ -48,9 +51,15 @@ return {
 		-- don't fight over conceal.
 		ui = { enable = false },
 
-		follow_url_func = function(url)
-			vim.ui.open(url)
-		end,
+		-- `Obsidian <subcommand>`, not the old `ObsidianSubcommand` camel-case
+		-- commands: the keys below already use the new form, and leaving this
+		-- at its default of true only registers a second set of commands and
+		-- warns about them on every load (they go away in obsidian.nvim 4.0).
+		legacy_commands = false,
+
+		-- No follow_url_func: it is deprecated (removed in obsidian.nvim 3.18)
+		-- and the plugin now opens URLs with vim.ui.open itself, which is
+		-- exactly what the function here used to do.
 	},
 	keys = {
 		{ "<leader>on", "<cmd>Obsidian new<cr>", desc = "Obsidian: new note" },
