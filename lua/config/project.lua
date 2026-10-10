@@ -23,6 +23,9 @@ local DEFAULT_IGNORE = {
 	".venv",
 	".tox",
 	".cache",
+	-- tool state, not projects: ~/.claude/plugins/marketplaces/* are each a
+	-- git repo, so without this they dominate a $HOME scan (4 of 7 here).
+	".claude",
 	".idea",
 	".vscode",
 	".cargo",
@@ -126,7 +129,15 @@ function M.clear_root_cache()
 	root_cache = {}
 end
 
-function M.find_projects(root, opts)
+-- A resumable breadth-first project scan.
+--
+-- `step(budget)` visits at most `budget` directories and returns whether work
+-- remains, so one traversal serves both callers: M.find_projects drains it in
+-- a single call, M.find_projects_async slices it across event-loop ticks. The
+-- scan is one function rather than two because the pruning, ignore and depth
+-- rules are the fiddly part and must not drift between a blocking and a
+-- non-blocking copy.
+local function scanner(root, opts)
 	opts = opts or {}
 	local markers = opts.markers or MARKERS
 	local ignore_dirs = opts.ignore_dirs or DEFAULT_IGNORE
@@ -137,9 +148,6 @@ function M.find_projects(root, opts)
 
 	root = vim.fn.fnamemodify(root or uv_cwd(), ":p")
 	local st = uv_fs_stat(root)
-	if not st or st.type ~= "directory" then
-		return {}
-	end
 
 	local function should_ignore(name)
 		for _, d in ipairs(ignore_dirs) do
@@ -158,40 +166,261 @@ function M.find_projects(root, opts)
 		end
 	end
 
-	local queue = { { root, 0 } }
+	-- An unreadable or missing root simply yields nothing.
+	local queue = (st and st.type == "directory") and { { root, 0 } } or {}
 	local head = 1
-	while head <= #queue and #results < limit do
-		local dir, depth = queue[head][1], queue[head][2]
-		head = head + 1
 
-		if has_marker(dir, markers) then
-			add(dir)
-			if prune_on_match then
-				goto continue
+	local function more()
+		return head <= #queue and #results < limit
+	end
+
+	-- `deadline_ns` matters more than `budget`: a slice measured in directories
+	-- blocks for however long those directories take, which on a slow or
+	-- network filesystem is unbounded. Time-bounding the slice keeps the pause
+	-- the same regardless of how expensive each scandir turns out to be.
+	local function step(budget, deadline_ns)
+		local visited = 0
+		while more() and visited < budget do
+			if deadline_ns and vim.uv.hrtime() > deadline_ns then
+				break
 			end
-		end
+			local dir, depth = queue[head][1], queue[head][2]
+			head = head + 1
+			visited = visited + 1
 
-		if depth < max_depth then
-			local ok, iter = pcall(uv_fs_scandir, dir)
-			if ok and iter then
-				while true do
-					local name, typ = uv_fs_scandir_next(iter)
-					if not name then
-						break
-					end
-					if (typ == "directory") or (typ == "link" and follow_links) then
-						if not should_ignore(name) then
-							queue[#queue + 1] = { vim.fs.joinpath(dir, name), depth + 1 }
+			local matched = has_marker(dir, markers)
+			if matched then
+				add(dir)
+			end
+
+			-- prune_on_match stops at the first marker; without it the walk
+			-- descends into projects too, which is how a repo inside a repo
+			-- (vendored checkout, submodule, sub-crate) gets listed.
+			if not (matched and prune_on_match) and depth < max_depth then
+				local ok, iter = pcall(uv_fs_scandir, dir)
+				if ok and iter then
+					while true do
+						local name, typ = uv_fs_scandir_next(iter)
+						if not name then
+							break
+						end
+						if (typ == "directory") or (typ == "link" and follow_links) then
+							if not should_ignore(name) then
+								queue[#queue + 1] = { vim.fs.joinpath(dir, name), depth + 1 }
+							end
 						end
 					end
 				end
 			end
 		end
-		::continue::
+		return more()
 	end
 
+	return step, results
+end
+
+function M.find_projects(root, opts)
+	local step, results = scanner(root, opts)
+	while step(math.huge) do
+	end
 	table.sort(results)
 	return results
+end
+
+--- Which `fd` to use, if any. Debian installs the binary as `fdfind`.
+local function fd_bin()
+	for _, b in ipairs({ "fd", "fdfind" }) do
+		if vim.fn.executable(b) == 1 then
+			return b
+		end
+	end
+end
+
+--- `fd` invocation that finds marker files/dirs anywhere under `root`.
+---
+--- Three flags carry the whole design:
+---   --hidden     `.git` is a dotfile and would otherwise be invisible
+---   --no-ignore  a project ignored by some parent .gitignore is still a project
+---   --prune      report a matched directory but do not walk into it, so `.git`
+---                costs one directory instead of its whole object store
+--- `.git` is deliberately *not* passed as --exclude even though DEFAULT_IGNORE
+--- lists it: excluding it would drop the very markers being searched for, and
+--- --prune already stops the descent.
+local function fd_cmd(bin, root, opts)
+	local markers = opts.markers or MARKERS
+	local names = {}
+	for _, m in ipairs(markers) do
+		names[#names + 1] = (m:gsub("%%.", "\\."))
+	end
+
+	local cmd = {
+		bin,
+		"--hidden",
+		"--no-ignore",
+		"--absolute-path",
+		"--prune",
+		("^(%s)$"):format(table.concat(names, "|")),
+	}
+	if opts.max_depth and opts.max_depth ~= math.huge then
+		vim.list_extend(cmd, { "--max-depth", tostring(opts.max_depth) })
+	end
+	if opts.limit and opts.limit ~= math.huge then
+		vim.list_extend(cmd, { "--max-results", tostring(opts.limit) })
+	end
+
+	local marker_set = {}
+	for _, m in ipairs(markers) do
+		marker_set[m] = true
+	end
+	for _, d in ipairs(opts.ignore_dirs or DEFAULT_IGNORE) do
+		if not marker_set[d] then
+			vim.list_extend(cmd, { "--exclude", d })
+		end
+	end
+
+	cmd[#cmd + 1] = root
+	return cmd
+end
+
+--- The same scan as M.find_projects_async, handed to `fd` instead.
+---
+--- fd is parallel and native, which is the difference between "the picker
+--- fills over a second or two" and "the picker is already full": on a $HOME of
+--- 65k directories the Lua walk takes ~1.6 s and fd ~0.2 s. The Lua walk stays
+--- as the fallback for machines without fd, and for prune_on_match, which fd
+--- cannot express -- its --prune acts on matched *markers*, not on the project
+--- directory that contains them.
+---
+---@return fun()|nil cancel nil when fd cannot serve this scan
+function M.find_projects_fd(root, opts, on_batch, on_done)
+	opts = opts or {}
+	local bin = fd_bin()
+	if not bin or opts.prune_on_match then
+		return nil
+	end
+	root = vim.fn.fnamemodify(root or uv_cwd(), ":p")
+
+	local results, seen = {}, {}
+	local pending, dirty, cancelled = "", false, false
+
+	-- fd prints a trailing slash on directories, so strip it before taking the
+	-- parent: dirname("~/p/.git/") is "~/p/.git", not "~/p".
+	local function take(line)
+		if line == "" then
+			return
+		end
+		local dir = vim.fs.dirname((line:gsub("/+$", "")))
+		if dir and dir ~= "" and not seen[dir] then
+			seen[dir] = true
+			results[#results + 1] = dir
+			dirty = true
+		end
+	end
+
+	-- stdout arrives in chunks that split lines anywhere.
+	local function feed(chunk)
+		pending = pending .. chunk
+		while true do
+			local nl = pending:find("\n", 1, true)
+			if not nl then
+				break
+			end
+			take(pending:sub(1, nl - 1))
+			pending = pending:sub(nl + 1)
+		end
+	end
+
+	local handle = vim.system(fd_cmd(bin, root, opts), {
+		text = true,
+		-- This runs in a fast event context: parse here, touch the editor only
+		-- inside vim.schedule.
+		stdout = function(_, chunk)
+			if cancelled or not chunk then
+				return
+			end
+			feed(chunk)
+			if dirty then
+				dirty = false
+				vim.schedule(function()
+					if not cancelled and on_batch then
+						on_batch(results)
+					end
+				end)
+			end
+		end,
+	}, function()
+		vim.schedule(function()
+			if cancelled then
+				return
+			end
+			take(pending)
+			table.sort(results)
+			if on_done then
+				on_done(results)
+			end
+		end)
+	end)
+
+	return function()
+		cancelled = true
+		pcall(function()
+			handle:kill(15)
+		end)
+	end
+end
+
+--- M.find_projects without blocking the editor.
+---
+--- `limit` caps results, not work: a recursive scan of a $HOME holding tens of
+--- thousands of directories keeps walking long after it has found everything,
+--- and doing that synchronously is what made the recursive picker feel hung.
+--- This runs the same traversal in slices, handing control back to the event
+--- loop between them, and reports what it has so far after every slice that
+--- found something -- so a picker can fill while the scan is still running.
+---
+--- Results arrive in breadth-first order (shallowest first) and are sorted
+--- only at the end; re-sorting mid-scan would reshuffle a list someone is
+--- already looking at.
+---
+---@param root string
+---@param opts table|nil as M.find_projects, plus `budget_ms` (milliseconds of
+---  walking per event-loop tick, default 8 -- under one frame) and `slice` (a
+---  hard directory cap per tick, default 2000)
+---@param on_batch fun(results: string[])|nil called after a slice found something
+---@param on_done fun(results: string[])|nil called once, after the final slice
+---@return fun() cancel stops the walk (call it when the picker closes)
+function M.find_projects_async(root, opts, on_batch, on_done)
+	opts = opts or {}
+	local slice = opts.slice or 2000
+	local budget_ms = opts.budget_ms or 8
+	local step, results = scanner(root, opts)
+	local cancelled, reported = false, 0
+
+	local function tick()
+		if cancelled then
+			return
+		end
+		local busy = step(slice, vim.uv.hrtime() + budget_ms * 1e6)
+		if #results > reported then
+			reported = #results
+			if on_batch then
+				on_batch(results)
+			end
+		end
+		if busy then
+			vim.schedule(tick)
+		else
+			table.sort(results)
+			if on_done then
+				on_done(results)
+			end
+		end
+	end
+
+	vim.schedule(tick)
+	return function()
+		cancelled = true
+	end
 end
 
 -- Lazy-require Telescope only when the picker runs
@@ -220,10 +449,16 @@ function M.project_picker(root, opts)
 		return
 	end
 
-	local projects = M.find_projects(root, opts.scan)
-	if #projects == 0 then
-		vim.notify("No projects found under " .. vim.fn.fnamemodify(root or (uv_cwd()), ":~"), vim.log.levels.WARN)
-		return
+	-- Synchronous callers (a bounded scan) keep the old contract: nothing found
+	-- means say so and never open an empty picker. The async path cannot know
+	-- that yet, so it opens first and reports at the end -- see below.
+	local projects = {}
+	if not opts.async then
+		projects = M.find_projects(root, opts.scan)
+		if #projects == 0 then
+			vim.notify("No projects found under " .. vim.fn.fnamemodify(root or (uv_cwd()), ":~"), vim.log.levels.WARN)
+			return
+		end
 	end
 
 	local scope = opts.scope or "global" -- 'global' | 'tab' | 'window'
@@ -240,56 +475,121 @@ function M.project_picker(root, opts)
 	local open_kind = opts.open or "find_files" -- string or function(dir)
 
 	local theme = t.themes.get_ivy()
-	t.pickers
-		.new(theme, {
-			prompt_title = ("Projects (%s)"):format(vim.fn.fnamemodify(root or uv_cwd(), ":~")),
-			finder = t.finders.new_table({
-				results = projects,
+	local where = vim.fn.fnamemodify(root or uv_cwd(), ":~")
+	local picker = t.pickers.new(theme, {
+		prompt_title = opts.async and ("Projects (%s) -- scanning"):format(where) or ("Projects (%s)"):format(where),
+		finder = t.finders.new_table({
+			results = projects,
+			entry_maker = function(path)
+				return { value = path, ordinal = path, display = vim.fn.fnamemodify(path, ":~") }
+			end,
+		}),
+		sorter = t.conf.generic_sorter(theme),
+		attach_mappings = function(bufnr, map)
+			local function open_after_switch(which)
+				local entry = t.action_state.get_selected_entry()
+				if not entry or not entry.value then
+					return
+				end
+				local dir = entry.value
+				t.actions.close(bufnr)
+				do_chdir(dir)
+
+				if type(open_kind) == "function" then
+					return open_kind(dir)
+				end
+				local ivy = t.themes.get_ivy()
+				if which == "live_grep" then
+					t.builtin.live_grep(vim.tbl_deep_extend("force", ivy, { cwd = dir }))
+				else
+					t.builtin.find_files(vim.tbl_deep_extend("force", ivy, { cwd = dir }))
+				end
+			end
+
+			t.actions.select_default:replace(function()
+				open_after_switch(open_kind)
+			end)
+			map("i", "<C-f>", function()
+				open_after_switch("find_files")
+			end)
+			map("n", "<C-f>", function()
+				open_after_switch("find_files")
+			end)
+			map("i", "<C-g>", function()
+				open_after_switch("live_grep")
+			end)
+			map("n", "<C-g>", function()
+				open_after_switch("live_grep")
+			end)
+			return true
+		end,
+	})
+
+	picker:find()
+
+	if not opts.async then
+		return
+	end
+
+	-- Fill the picker as the scan runs. Refreshing swaps in a new table finder
+	-- over the results so far; reset_prompt stays false so whatever has been
+	-- typed keeps filtering. The title carries the count, because an empty
+	-- picker that is merely still scanning looks like a broken one.
+	local function title(text)
+		pcall(function()
+			picker.layout.prompt.border:change_title(text)
+		end)
+	end
+
+	local cancel
+	local function refresh(results)
+		if picker.closed then
+			if cancel then
+				cancel()
+			end
+			return
+		end
+		picker:refresh(
+			t.finders.new_table({
+				results = vim.list_slice(results, 1, #results),
 				entry_maker = function(path)
 					return { value = path, ordinal = path, display = vim.fn.fnamemodify(path, ":~") }
 				end,
 			}),
-			sorter = t.conf.generic_sorter(theme),
-			attach_mappings = function(bufnr, map)
-				local function open_after_switch(which)
-					local entry = t.action_state.get_selected_entry()
-					if not entry or not entry.value then
-						return
-					end
-					local dir = entry.value
-					t.actions.close(bufnr)
-					do_chdir(dir)
+			{ reset_prompt = false }
+		)
+	end
 
-					if type(open_kind) == "function" then
-						return open_kind(dir)
-					end
-					local ivy = t.themes.get_ivy()
-					if which == "live_grep" then
-						t.builtin.live_grep(vim.tbl_deep_extend("force", ivy, { cwd = dir }))
-					else
-						t.builtin.find_files(vim.tbl_deep_extend("force", ivy, { cwd = dir }))
-					end
-				end
+	local function batch(results)
+		refresh(results)
+		title(("Projects (%s) -- %d, scanning"):format(where, #results))
+	end
 
-				t.actions.select_default:replace(function()
-					open_after_switch(open_kind)
-				end)
-				map("i", "<C-f>", function()
-					open_after_switch("find_files")
-				end)
-				map("n", "<C-f>", function()
-					open_after_switch("find_files")
-				end)
-				map("i", "<C-g>", function()
-					open_after_switch("live_grep")
-				end)
-				map("n", "<C-g>", function()
-					open_after_switch("live_grep")
-				end)
-				return true
-			end,
-		})
-		:find()
+	local function finish(results)
+		if picker.closed then
+			return
+		end
+		refresh(results)
+		title(("Projects (%s) -- %d"):format(where, #results))
+		if #results == 0 then
+			vim.notify("No projects found under " .. where, vim.log.levels.WARN)
+		end
+	end
+
+	-- fd when it is installed (parallel and native, roughly 8x the Lua walk),
+	-- otherwise the pure-Lua sliced walk. Both stream into the same refresh.
+	cancel = M.find_projects_fd(root, opts.scan, batch, finish) or M.find_projects_async(root, opts.scan, batch, finish)
+
+	-- Stop walking when the picker goes away, rather than scanning $HOME for
+	-- nobody. Telescope sets picker.closed on close; the autocmd catches the
+	-- buffer being wiped even if that is bypassed.
+	vim.api.nvim_create_autocmd("BufWipeout", {
+		buffer = picker.prompt_bufnr,
+		once = true,
+		callback = function()
+			cancel()
+		end,
+	})
 end
 
 -- ---------------------------------------------------------------------------
