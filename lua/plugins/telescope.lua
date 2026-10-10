@@ -48,6 +48,15 @@ local opts = {
 -- with no marker anywhere below it would otherwise be walked to depth 16.
 local PROJECT_SCAN = { max_depth = 8, limit = 1000, prune_on_match = true }
 
+-- <leader>pp lists *every* project under $HOME, so it drops both of the bounds
+-- above: no depth cap, and no prune_on_match -- a repo inside a repo (a vendored
+-- checkout, a submodule, a sub-crate with its own Cargo.toml) is a project you
+-- may want to switch to, and pruning at the first marker hides exactly those.
+-- What keeps it honest is DEFAULT_IGNORE in config.project, which skips the
+-- heavy directories (node_modules, target, .venv, .cargo, .rustup, .claude,
+-- ...); `limit` is the remaining safety valve, because the walk is synchronous.
+local PROJECT_SCAN_DEEP = { max_depth = math.huge, limit = 2000, prune_on_match = false }
+
 -- helper so we never mutate the base Ivy opts
 local function with_ivy(opts)
 	return vim.tbl_deep_extend("force", require("telescope.themes").get_ivy(), opts or {})
@@ -87,6 +96,31 @@ return {
 				require("telescope").extensions.frecency.frecency(with_ivy({ workspace = "CWD" }))
 			end,
 			desc = "Frecency (project)",
+		},
+		-- Project selector for the <leader>p group: every project under $HOME,
+		-- and the one you pick becomes *the* current project. It is a plain
+		-- `:cd` (scope "global") rather than <leader>fp's tab-local `:tcd`,
+		-- because "the current project" is a session-wide notion -- and because
+		-- chdir, not the root pin, is what actually switches projects: a pin
+		-- only applies inside its own tree (see config.project), so pinning an
+		-- unrelated project would be ignored. Any existing pin is deliberately
+		-- left alone; config.project's contract is that it reactivates if you
+		-- come back. <C-f> / <C-g> inside the picker still switch and then open
+		-- find_files / live_grep, as they do for <leader>fp.
+		{
+			"<leader>pp",
+			function()
+				require("config.project").project_picker("~", {
+					scan = PROJECT_SCAN_DEEP,
+					async = true,
+					scope = "global",
+					open = function(dir)
+						vim.notify("project: " .. vim.fn.fnamemodify(dir, ":~"), vim.log.levels.INFO)
+						pcall(vim.cmd.redrawstatus)
+					end,
+				})
+			end,
+			desc = "Project: select (under $HOME)",
 		},
 		{
 			"<leader>fp",

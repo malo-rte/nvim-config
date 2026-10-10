@@ -183,9 +183,30 @@ after the path in the statusline.
 
 | Key | Action |
 |---|---|
+| `<leader>pp` | Select the current project (any project under `$HOME`) |
 | `<leader>pu` | Root: up a level (submodule → superproject) |
 | `<leader>pd` | Root: down a level (into a submodule / nested repo) |
 | `<leader>pr` | Root: reset to the buffer's own repo |
+
+`<leader>pp` scans `$HOME` recursively for projects (`.git`, `Cargo.toml`,
+`go.mod`, `pyproject.toml`, `package.json`) and `:cd`s to the one you pick,
+making it the project every root-anchored operation uses. Recursive means *all*
+of them: no depth limit, and it does not stop at the first marker, so a repo
+inside a repo — a vendored checkout, a submodule, a sub-crate with its own
+`Cargo.toml` — is listed too. Heavy directories are still skipped
+(`node_modules`, `target`, `.venv`, `.cargo`, `.claude`, … — `DEFAULT_IGNORE`
+in `lua/config/project.lua`). The scan runs `fd` when it is installed and
+streams into the picker as results arrive, so the picker is up in ~15 ms and
+full shortly after — about 70 ms for a `$HOME` of 65k directories. Without
+`fd` it falls back to a pure-Lua walk, sliced across event-loop ticks so the
+editor stays responsive; that path takes ~2 s on the same tree, which is why
+`fd` is worth having on PATH (the dev container installs it; on NixOS provide
+it via nix).
+
+`<leader>fp` is the "switch and start searching" flow instead: a bounded scan
+(depth 8, stops at the first marker), chdir for the **tab** only, and find_files
+straight away. Inside either picker, `<C-f>` / `<C-g>` switch and then open
+find_files / live_grep.
 
 `<leader>pd` takes the submodule the current buffer is in when there is one,
 otherwise it asks (via `vim.ui.select`, so through Telescope). The pin applies
