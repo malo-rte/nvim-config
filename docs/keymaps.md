@@ -7,8 +7,11 @@ Every mapping this config creates, recorded during a real headless boot
 mappings made inside plugins are included too. Group *names* are not
 repeated here -- README.md is where the groups are described and why.
 
+Sorted by key. For the same mappings grouped by what they belong to, see
+[keymaps-by-plugin.md](keymaps-by-plugin.md).
+
 Run `scripts/keymaps.py` to check for conflicts, `--doc` to regenerate
-this file.
+both files.
 
 | | |
 |---|---|
@@ -79,8 +82,8 @@ this file.
 | `<leader>gco` | normal | Conflict: take ours (&lt;&lt;&lt;) | `config:lua/plugins/git-conflict.lua:41` |
 | `<leader>gct` | normal | Conflict: take theirs (&gt;&gt;&gt;) | `config:lua/plugins/git-conflict.lua:41` |
 | `<leader>gd` | normal | Diffview: toggle (working tree) | `spec:diffview.nvim` |
-| `<leader>gF` | normal | Diffview: file history (repo) | `spec:diffview.nvim` |
 | `<leader>gf` | normal | Diffview: file history (current file) | `spec:diffview.nvim` |
+| `<leader>gF` | normal | Diffview: file history (repo) | `spec:diffview.nvim` |
 | `<leader>gm` | normal | Git: next merge conflict | `config:lua/config/keymaps.lua:119` |
 | `<leader>go` | normal | Git: toggle inline diff overlay | `config:lua/plugins/git.lua:75` |
 | `<leader>gra` | normal | Rebase: abort | `config:lua/config/gitconflict.lua:274` |
@@ -113,8 +116,8 @@ this file.
 | `<leader>oo` | normal | Obsidian: quick switch | `spec:obsidian.nvim` |
 | `<leader>or` | normal | Obsidian: rename note | `spec:obsidian.nvim` |
 | `<leader>os` | normal | Obsidian: search (grep) | `spec:obsidian.nvim` |
-| `<leader>oT` | normal | Obsidian: insert template | `spec:obsidian.nvim` |
 | `<leader>ot` | normal | Obsidian: today's daily | `spec:obsidian.nvim` |
+| `<leader>oT` | normal | Obsidian: insert template | `spec:obsidian.nvim` |
 | `<leader>ov` | normal | Obsidian: open project vault | `config:lua/config/vault.lua:127` |
 | `<leader>ox` | normal | Obsidian: toggle checkbox | `spec:obsidian.nvim` |
 | `<leader>oy` | normal | Obsidian: yesterday's daily | `spec:obsidian.nvim` |

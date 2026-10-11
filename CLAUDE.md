@@ -66,9 +66,18 @@ Two scripts wrap the checks so nothing has to be retyped:
   ones made *inside* plugins (mini.surround's `sa`), which no scan of this repo
   can see. `scripts/keymaps.py` drives it:
   - `scripts/keymaps.py` — conflict report (exit 0 clean, 1 conflicts, 2 the
-    tool could not run). `--doc` regenerates `docs/keymaps.md`,
+    tool could not run). `--doc` regenerates **both** documents
+    (`docs/keymaps.md` by key, `docs/keymaps-by-plugin.md` by owner),
     `--json P` saves the raw inventory, `--inventory P` reuses one without
     booting, `--self-test` plants conflicts and insists they are all found.
+  - The per-plugin view merges a plugin's lazy `keys` spec with the mappings it
+    creates itself, and credits mappings set in `lua/plugins/<x>.lua` to that
+    plugin — but only when the file names exactly one plugin lazy knows about
+    (26 of 36 files). The rest list their dependencies in the same spec, and
+    knowing which spec block a line sits in would need real Lua parsing, so
+    those stay as file sections naming what they configure. lazy records no
+    declaring module here: `plugin._.module` and the fragment metadata are
+    both `nil`, which is why the repo strings are read from the file instead.
   - `check.sh` runs `keymaps` (README coverage) and `conflicts` off **one**
     shared boot; `inventory()` in that script is the cache.
   - **Reading the keymap table afterwards is not equivalent** -- it keeps only
@@ -81,10 +90,10 @@ Two scripts wrap the checks so nothing has to be retyped:
     Hence the attribution canaries in `keymaps.py` (one mapping per owner
     class: config / lazy spec / plugin-created), which refuse to print a
     result if they go missing, and `--self-test`.
-  - `docs/keymaps.md` is **generated** and depends on the environment (which
-    language servers attach, which buffers could be probed), so it is
+  - Both documents are **generated** and depend on the environment (which
+    language servers attach, which buffers could be probed), so they are
     deliberately **not** staleness-checked the way `ftype_icons.lua` is.
-    Regenerate it on the machine whose mappings you mean to document.
+    Regenerate them on the machine whose mappings you mean to document.
 - **`python3 scripts/audit_keymaps.py`** checks every mapping the config defines
   is named in README.md (exit 0 clean, 1 undocumented, 2 the audit itself
   failed). Run it after adding or renaming a keymap. It now takes its mappings

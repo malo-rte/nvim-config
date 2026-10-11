@@ -23,7 +23,9 @@ buffer-local (active only when a language server is attached).
 The sections below are the curated list: what each key is for, and why. For the
 *complete* inventory -- every mapping that exists after a real boot, including
 the ones plugins create internally, each with the file and line that defined it
--- see **[docs/keymaps.md](docs/keymaps.md)**, regenerated with
+-- see **[docs/keymaps.md](docs/keymaps.md)** (sorted by key) and
+**[docs/keymaps-by-plugin.md](docs/keymaps-by-plugin.md)** (grouped by the
+plugin or file each mapping belongs to). Both are regenerated with
 `scripts/keymaps.py --doc`. The same tool reports keys claimed from two places
 (`scripts/keymaps.py`, or `scripts/check.sh conflicts`).
 
@@ -322,9 +324,10 @@ scripts/              check.sh (every check at once: format, lint, boot, keymaps
                       nvim-sandbox.sh (boot this config against a throwaway copy),
                       gen_ftype_icons.py (file-type icon map from the spec),
                       keymap_inventory.lua + keymaps.py (record every mapping
-                      during a real boot: docs/keymaps.md, conflict report),
+                      during a real boot: the docs below, conflict report),
                       audit_keymaps.py (every mapping is named in this README)
-docs/keymaps.md       generated: every mapping, with where it comes from
+docs/                 generated: keymaps.md (by key) and keymaps-by-plugin.md
+                      (by plugin), each mapping with the file that defined it
 docker/               dev container: Neovim 0.12, tree-sitter CLI, node,
                       ripgrep/fd, stylua/luacheck/shellcheck/shfmt/jq
 ```

@@ -192,6 +192,27 @@ local function lazy_keys()
 	return found
 end
 
+-- Every plugin lazy knows about, so the driver can group by plugin and
+-- validate the repo names it reads out of lua/plugins/*.lua against reality.
+local function plugin_list()
+	local ok, config = pcall(require, "lazy.core.config")
+	if not ok then
+		return {}
+	end
+	local all = {}
+	for name, plugin in pairs(config.plugins) do
+		all[#all + 1] = {
+			name = name,
+			url = plugin.url,
+			dir = plugin.dir and vim.fn.fnamemodify(plugin.dir, ":t") or nil,
+		}
+	end
+	table.sort(all, function(a, b)
+		return a.name < b.name
+	end)
+	return all
+end
+
 -- Load everything. In a headless boot `VeryLazy` never fires (it hangs off
 -- UIEnter), so hlslens, git-conflict, dap and friends would contribute no
 -- mappings at all and the dump would quietly miss ~25 keys.
@@ -310,6 +331,7 @@ vim.defer_fn(function()
 		nvim = tostring(vim.version()),
 		log = log,
 		lazy_keys = lazy_keys(),
+		plugins = plugin_list(),
 		defaults = base_list,
 		final = final_table(),
 		unloaded_plugins = unloaded,
