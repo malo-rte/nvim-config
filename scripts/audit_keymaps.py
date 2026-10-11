@@ -3,57 +3,48 @@
 
 Exit status: 0 all documented, 1 some undocumented, 2 the audit could not run.
 
-Mappings come from two places, and both are read the reliable way rather than
-by pattern-matching Lua:
+    python3 scripts/audit_keymaps.py
+    python3 scripts/audit_keymaps.py --inventory inv.json   # reuse a dump
 
-  * lazy.nvim `keys = { ... }` specs are dumped from the *live* plugin table by
-    a headless Neovim, so lazy's own parser decides what a key spec is. Reading
-    them out of the source text looks easy and is not: an earlier version of
-    this check used a regex over `keys = {` blocks, stopped at the first nested
-    entry, and quietly reported "all documented" while missing several keys.
-    That is the failure this script exists to prevent, so it refuses to report
-    success unless the canaries below are found.
-  * `vim.keymap.set("mode", "lhs", ...)` calls, which are regular enough in
-    this tree to match directly.
+The mappings come from scripts/keymaps.py, which records them during a real
+boot (see scripts/keymap_inventory.lua). This script used to find them two
+other ways, and both under-reported:
 
-Neovim is run against a *copy* of the repo, never the repo itself: lazy writes
-lazy-lock.json into stdpath('config') and would rewrite the committed file.
+  * A regex over `vim.keymap.set("mode", "lhs", ...)` calls. It cannot see a
+    mapping defined through an alias or a helper -- `local map = vim.keymap.set`
+    in config/yocto.lua, `local function map(keys, ...)` in config/lsp.lua --
+    and this config defines 45 mappings that way. They were silently exempt
+    from this check.
+  * `plugin.keys` read from lazy's plugin table, which returns only the last
+    spec fragment's list.
+
+Before that it used a regex over `keys = {` blocks, which stopped at the first
+nested entry and reported "all documented" while missing several keys. That is
+the failure this script exists to prevent, which is why it still refuses to
+report success unless the canaries below are found.
+
+Only mappings this config *authors* are audited -- its own `vim.keymap.set`
+calls and its lazy `keys` specs. Mappings created inside a plugin (mini.surround
+binding `sa` from its own options) are in docs/keymaps.md but are not something
+README.md is expected to list key by key.
 """
 
 import argparse
-import glob
+import importlib.util
+import json
 import os
 import re
-import shutil
-import subprocess
 import sys
-import tempfile
 
-# If any of these is missing from the extracted set, extraction is broken and
-# a clean report would be a lie. One from a lazy `keys` spec, one from a
-# vim.keymap.set call, one from a spec entry that is not the block's first.
-CANARIES = ("<leader>xq", "<leader>xl", "<leader>ff", "<leader>qq")
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
 
-LUA_DUMP = r"""
-local ok, config = pcall(require, "lazy.core.config")
-if not ok then
-  io.stderr:write("<<KEYS>>\n<<END>>\n")
-  vim.cmd("qa!")
-  return
-end
-local out = {}
-for name, plugin in pairs(config.plugins) do
-  for _, key in ipairs(plugin.keys or {}) do
-    local lhs = type(key) == "string" and key or key[1]
-    if lhs then
-      out[#out + 1] = lhs .. "\t" .. name
-    end
-  end
-end
-table.sort(out)
-io.stderr:write("<<KEYS>>\n" .. table.concat(out, "\n") .. "\n<<END>>\n")
-vim.cmd("qa!")
-"""
+# If any of these is missing from the authored set, extraction is broken and a
+# clean report would be a lie. One from a lazy `keys` spec, one from a spec
+# entry that is not its block's first, one from a plain vim.keymap.set, and one
+# defined through a local alias (the class the old regex could not see).
+CANARIES = ("<leader>xq", "<leader>xl", "<leader>ff", "<leader>qq", "<leader>yb")
+
 
 def die(message):
     """Fail in a way that cannot be mistaken for a clean audit."""
@@ -61,41 +52,40 @@ def die(message):
     raise SystemExit(2)
 
 
-SETCALL = re.compile(r'vim\.keymap\.set\(\s*(?:\{[^}]*\}|"[^"]*")\s*,\s*"((?:[^"\\]|\\.)*)"')
-
-
-def lazy_keys(root, nvim, timeout):
-    """lhs -> plugin name, straight from lazy's parsed plugin table."""
-    tmp = tempfile.mkdtemp(prefix="audit-keymaps-")
+def load_keymaps_module():
+    sys.dont_write_bytecode = True
+    path = os.path.join(HERE, "keymaps.py")
+    spec = importlib.util.spec_from_file_location("keymaps_inventory_driver", path)
+    if spec is None or spec.loader is None:
+        die("cannot load %s" % path)
+    module = importlib.util.module_from_spec(spec)
     try:
-        cfg = os.path.join(tmp, "cfg")
-        os.makedirs(cfg)
-        shutil.copytree(root, os.path.join(cfg, "nvim"), ignore=shutil.ignore_patterns(".git"))
-        dump = os.path.join(tmp, "dump.lua")
-        with open(dump, "w", encoding="utf-8") as fh:
-            fh.write(LUA_DUMP)
-        env = dict(os.environ, XDG_CONFIG_HOME=cfg)
+        spec.loader.exec_module(module)
+    except Exception as exc:  # noqa: BLE001 - any failure here is fatal anyway
+        die("cannot load %s: %s" % (path, exc))
+    return module
+
+
+def authored_mappings(args):
+    """lhs -> set of owners, for every mapping this config defines itself."""
+    km = load_keymaps_module()
+    if args.inventory:
         try:
-            proc = subprocess.run(
-                [nvim, "--headless", "-c", "luafile " + dump],
-                env=env, capture_output=True, text=True, timeout=timeout,
-            )
-        except FileNotFoundError:
-            die("%s not found; cannot read the lazy key specs" % nvim)
-        except subprocess.TimeoutExpired:
-            die("%s timed out after %ss (first run installs plugins; retry)" % (nvim, timeout))
-        body = re.search(r"<<KEYS>>\n(.*?)\n?<<END>>", proc.stderr, re.S)
-        if not body:
-            sys.stderr.write(proc.stderr[-2000:] + "\n")
-            die("no key dump in Neovim's output (see above)")
-        found = {}
-        for line in body.group(1).splitlines():
-            lhs, _, who = line.partition("\t")
-            if lhs:
-                found.setdefault(lhs, set()).add(who)
-        return found
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+            with open(args.inventory, encoding="utf-8") as fh:
+                payload = json.load(fh)
+        except (OSError, ValueError) as exc:
+            die("cannot read %s: %s" % (args.inventory, exc))
+    else:
+        payload = km.collect(args.nvim, args.timeout, args.wait_ms)
+
+    maps = km.build(payload)
+    km.check_canaries(maps)
+
+    found = {}
+    for mapping in maps:
+        if mapping.owner_kind in ("config", "spec"):
+            found.setdefault(mapping.lhs or mapping.key, set()).add(mapping.owner)
+    return found
 
 
 def documented_keys(readme):
@@ -120,19 +110,17 @@ def documented_keys(readme):
 
 
 def main():
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--nvim", default="nvim", help="Neovim binary to dump specs with")
+    ap.add_argument("--nvim", default="nvim", help="Neovim binary to dump with")
     ap.add_argument("--timeout", type=int, default=300, help="seconds to allow it")
+    ap.add_argument("--wait-ms", type=int, default=9000,
+                    help="ms to let the config settle before dumping")
+    ap.add_argument("--inventory", metavar="PATH", default=None,
+                    help="read a saved inventory instead of booting Neovim")
     args = ap.parse_args()
 
-    defined = lazy_keys(root, args.nvim, args.timeout)
-    for path in sorted(glob.glob(os.path.join(root, "lua/**/*.lua"), recursive=True)
-                       + [os.path.join(root, "init.lua")]):
-        rel = os.path.relpath(path, root)
-        for m in SETCALL.finditer(open(path, encoding="utf-8").read()):
-            defined.setdefault(m.group(1), set()).add(rel)
+    defined = authored_mappings(args)
 
     absent = [c for c in CANARIES if c not in defined]
     if absent:
@@ -141,7 +129,7 @@ def main():
             "       If they were renamed, update CANARIES at the top of this script.\n"
             "       Refusing to report a result either way." % ", ".join(absent))
 
-    doc = documented_keys(os.path.join(root, "README.md"))
+    doc = documented_keys(os.path.join(ROOT, "README.md"))
     missing = sorted(k for k in defined if k.lower() not in doc)
     print("mappings defined: %d   documented: %d   undocumented: %d"
           % (len(defined), len(defined) - len(missing), len(missing)))

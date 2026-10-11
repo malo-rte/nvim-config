@@ -37,8 +37,9 @@ Two scripts wrap the checks so nothing has to be retyped:
 - **`scripts/check.sh`** — everything at once: `stylua --check`, a `loadfile`
   parse of every Lua file, `luacheck`, a Plane-15 glyph report, a staleness
   check on the generated `ftype_icons.lua`, `bash -n` + `shellcheck` on the
-  scripts, `py_compile`, the sandbox boot, and `audit_keymaps.py`. A tool that
-  is not installed is reported as **skip**, never a silent pass. `--fix` lets
+  scripts, `py_compile`, the sandbox boot, `audit_keymaps.py`, and the keymap
+  conflict check. A tool that is not installed is reported as **skip**, never
+  a silent pass. `--fix` lets
   the formatters write; `scripts/check.sh boot keymaps` runs a subset;
   `--list` names them. Run it in the container:
   `docker/enter-dev-container.sh scripts/check.sh`.
@@ -58,13 +59,52 @@ Two scripts wrap the checks so nothing has to be retyped:
   treesitter parsers in a smoke test — but it puts the config on its **NixOS**
   path (`env.is_nix`), so mason is skipped and the portable branch goes untested.
 - Parse check a file: `nvim --headless -u NONE -c "lua assert(loadfile('f.lua'))" -c qa`.
+- **Keymaps are inventoried from a real boot**, not from the source.
+  `scripts/keymap_inventory.lua` is loaded with `--cmd` so it runs *before*
+  `init.lua`, wraps `nvim_set_keymap`/`nvim_buf_set_keymap`, and records every
+  mapping as it is created with the file and line that made it -- including the
+  ones made *inside* plugins (mini.surround's `sa`), which no scan of this repo
+  can see. `scripts/keymaps.py` drives it:
+  - `scripts/keymaps.py` — conflict report (exit 0 clean, 1 conflicts, 2 the
+    tool could not run). `--doc` regenerates `docs/keymaps.md`,
+    `--json P` saves the raw inventory, `--inventory P` reuses one without
+    booting, `--self-test` plants conflicts and insists they are all found.
+  - `check.sh` runs `keymaps` (README coverage) and `conflicts` off **one**
+    shared boot; `inventory()` in that script is the cache.
+  - **Reading the keymap table afterwards is not equivalent** -- it keeps only
+    the winner, so two places claiming one key look like one mapping. That is
+    the whole reason for the wrapper approach.
+  - **Attribution is a silent failure mode.** Walking the stack to the wrong
+    frame gives every mapping one bogus owner, so every key has exactly one
+    owner and the report says "no conflicts" forever. That bug shipped during
+    development and was invisible until conflicts were planted on purpose.
+    Hence the attribution canaries in `keymaps.py` (one mapping per owner
+    class: config / lazy spec / plugin-created), which refuse to print a
+    result if they go missing, and `--self-test`.
+  - `docs/keymaps.md` is **generated** and depends on the environment (which
+    language servers attach, which buffers could be probed), so it is
+    deliberately **not** staleness-checked the way `ftype_icons.lua` is.
+    Regenerate it on the machine whose mappings you mean to document.
 - **`python3 scripts/audit_keymaps.py`** checks every mapping the config defines
   is named in README.md (exit 0 clean, 1 undocumented, 2 the audit itself
-  failed). Run it after adding or renaming a keymap. It reads lazy `keys` specs
-  from a headless Neovim's live plugin table, **not** by parsing the Lua --
-  a regex over `keys = {` blocks stops at the first nested entry and reports
-  "all documented" while silently missing keys, which is why the script has
-  canaries and refuses to print a result if they go missing.
+  failed). Run it after adding or renaming a keymap. It now takes its mappings
+  from the inventory above. Two earlier approaches under-reported, which is why
+  the canaries exist: a regex over `keys = {` blocks stopped at the first
+  nested entry, and a regex over `vim.keymap.set("mode", "lhs"` could not see
+  a mapping made through an alias (`local map = vim.keymap.set` in
+  `config/yocto.lua`, the `map()` helper in `config/lsp.lua`) -- 45 of this
+  config's mappings are defined that way and were silently exempt.
+- **`User VeryLazy` never fires in a headless boot** (it hangs off `UIEnter`),
+  so hlslens, git-conflict, dap, obsidian and ~15 others contribute nothing
+  unless something force-loads them — `keymap_inventory.lua` fires the event
+  and then calls `require("lazy").load`.
+- **`nvim_get_keymap()` returns `lhs` already in readable form** (`<Esc>`,
+  `<Space>ff`); putting that through `vim.fn.keytrans` escapes the `<` into
+  `<lt>` and makes every such mapping look unrecognised. `canonical()` in
+  `keymap_inventory.lua` is the one place that normalises either spelling.
+- **`Plugin.values(plugin, "keys", true)`, not `plugin.keys`**, to read a
+  plugin's lazy key specs: lazy merges `keys` (and deep-merges `opts`) across
+  spec fragments, and the raw field holds only the last fragment's list.
 - A modified **listed** buffer + `qa` (no `!`) **hangs** headless on the
   unsaved-changes prompt — always `qa!`, and use unlisted scratch buffers.
 - `require('lualine').statusline()` renders the **inactive** line (no

@@ -20,6 +20,13 @@ a plain editing session starts about half of the plugin list.
 [which-key](https://github.com/folke/which-key.nvim) menu. Many LSP keys are
 buffer-local (active only when a language server is attached).
 
+The sections below are the curated list: what each key is for, and why. For the
+*complete* inventory -- every mapping that exists after a real boot, including
+the ones plugins create internally, each with the file and line that defined it
+-- see **[docs/keymaps.md](docs/keymaps.md)**, regenerated with
+`scripts/keymaps.py --doc`. The same tool reports keys claimed from two places
+(`scripts/keymaps.py`, or `scripts/check.sh conflicts`).
+
 ### Leader groups
 
 | Prefix | Group |
@@ -314,7 +321,10 @@ lsp/                  one file per language server (driven by vim.lsp.enable)
 scripts/              check.sh (every check at once: format, lint, boot, keymaps),
                       nvim-sandbox.sh (boot this config against a throwaway copy),
                       gen_ftype_icons.py (file-type icon map from the spec),
+                      keymap_inventory.lua + keymaps.py (record every mapping
+                      during a real boot: docs/keymaps.md, conflict report),
                       audit_keymaps.py (every mapping is named in this README)
+docs/keymaps.md       generated: every mapping, with where it comes from
 docker/               dev container: Neovim 0.12, tree-sitter CLI, node,
                       ripgrep/fd, stylua/luacheck/shellcheck/shfmt/jq
 ```

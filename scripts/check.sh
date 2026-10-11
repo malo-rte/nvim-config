@@ -37,8 +37,22 @@ fail() { FAIL+=("$1"); printf '   FAIL: %s\n' "${2:-}"; }
 skip() { SKIP+=("$1"); printf '   skip: %s\n' "${2:-}"; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
+INVENTORY=""
+cleanup() { [[ -n ${INVENTORY} ]] && rm -f "${INVENTORY}"; }
+trap cleanup EXIT
+
+# Record every mapping the config creates, once per run. Exit 1 here means
+# conflicts were found, which is still a usable inventory -- only a missing
+# file is a real failure.
+inventory() {
+	[[ -n ${INVENTORY} && -s ${INVENTORY} ]] && return 0
+	INVENTORY="$(mktemp "${TMPDIR:-/tmp}/keymap-inventory.XXXXXX")"
+	python3 scripts/keymaps.py --json "${INVENTORY}" --quiet >/dev/null 2>&1
+	[[ -s ${INVENTORY} ]]
+}
+
 LUA_FILES=(init.lua)
-while IFS= read -r f; do LUA_FILES+=("$f"); done < <(find lua lsp -name '*.lua' | sort)
+while IFS= read -r f; do LUA_FILES+=("$f"); done < <(find lua lsp scripts -name '*.lua' | sort)
 SH_FILES=(scripts/check.sh scripts/nvim-sandbox.sh docker/enter-dev-container.sh)
 
 # --- format: stylua, against the committed .stylua.toml -------------------
@@ -72,6 +86,7 @@ check_lua() {
 local files = vim.fn.glob("init.lua", false, true)
 vim.list_extend(files, vim.fn.glob("lua/**/*.lua", false, true))
 vim.list_extend(files, vim.fn.glob("lsp/*.lua", false, true))
+vim.list_extend(files, vim.fn.glob("scripts/*.lua", false, true))
 local bad = 0
 for _, f in ipairs(files) do
 	local chunk, err = loadfile(f)
@@ -201,7 +216,9 @@ check_boot() {
 # --- keymaps: every mapping is named in README.md ------------------------
 check_keymaps() {
 	have nvim || { skip keymaps "nvim not installed"; return; }
-	python3 scripts/audit_keymaps.py
+	have python3 || { skip keymaps "python3 not installed"; return; }
+	inventory || { fail keymaps "could not record the mappings"; return; }
+	python3 scripts/audit_keymaps.py --inventory "${INVENTORY}"
 	case $? in
 	0) pass keymaps "all documented" ;;
 	1) fail keymaps "undocumented mappings above" ;;
@@ -209,7 +226,22 @@ check_keymaps() {
 	esac
 }
 
-ORDER=(format lua luacheck icons generated shell python boot keymaps)
+# --- conflicts: no two places claim the same key -------------------------
+# Warnings and notes are printed but do not fail the run; two owners for one
+# key do, because which one wins depends on load order.
+check_conflicts() {
+	have nvim || { skip conflicts "nvim not installed"; return; }
+	have python3 || { skip conflicts "python3 not installed"; return; }
+	inventory || { fail conflicts "could not record the mappings"; return; }
+	python3 scripts/keymaps.py --inventory "${INVENTORY}" --quiet
+	case $? in
+	0) pass conflicts "no key is claimed twice" ;;
+	1) fail conflicts "conflicting mappings above" ;;
+	*) fail conflicts "the conflict check itself could not run" ;;
+	esac
+}
+
+ORDER=(format lua luacheck icons generated shell python boot keymaps conflicts)
 [[ ${#WANT[@]} -gt 0 ]] && ORDER=("${WANT[@]}")
 
 for name in "${ORDER[@]}"; do
